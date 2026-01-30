@@ -1,7 +1,10 @@
 import { useAuth } from "../auth/useAuth";
+import { useNavigate } from "react-router-dom";
+
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
@@ -24,7 +27,11 @@ export default function DashboardPage() {
 
       {/* Cards resumen */}
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-8">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
+         {/* Vehículos (clickeable) */}
+        <div
+          onClick={() => navigate("/vehicles/new")}
+          className="cursor-pointer rounded-2xl border border-slate-800 bg-slate-900/40 p-4 hover:bg-slate-900/60 transition"
+        >
           <p className="text-sm text-slate-400">Vehículos</p>
           <p className="mt-2 text-3xl font-semibold">—</p>
           <p className="text-xs text-slate-500 mt-1">
