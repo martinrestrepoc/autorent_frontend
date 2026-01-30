@@ -1,1 +1,0 @@
-# autorent_frontend
