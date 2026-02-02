@@ -1,12 +1,10 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { getToken } from "../auth/token";
 
 type FieldErrors = Partial<Record<"plate" | "brand" | "model" | "year", string>>;
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
-
-// Acepta ABC123 o ABC1234
 const PLATE_REGEX = /^[A-Z]{3}\d{3,4}$/;
 
 function normalizeMessage(msg: any): string[] {
@@ -39,15 +37,15 @@ function mapBackendErrorsToFields(messages: string[]): { fieldErrors: FieldError
       continue;
     }
 
-    // si no se puede mapear a un campo, lo mostramos arriba
     formError = m;
   }
 
   return { fieldErrors, formError };
 }
 
-export default function VehiclesCreatePage() {
+export default function VehiclesEditPage() {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
 
   const [form, setForm] = useState({
     plate: "",
@@ -60,10 +58,10 @@ export default function VehiclesCreatePage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
 
   function onChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
-
     setForm((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: "" }));
     setFormError(null);
@@ -94,10 +92,56 @@ export default function VehiclesCreatePage() {
     return Object.keys(next).length === 0;
   }
 
+  useEffect(() => {
+    async function load() {
+      if (!id) return;
+
+      setLoadingData(true);
+      setFormError(null);
+
+      try {
+        const token = getToken();
+        const res = await fetch(`${API_URL}/vehicles/${id}`, {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          const messages = normalizeMessage(data?.message);
+          setFormError(messages[0] ?? "No se pudo cargar el vehículo");
+          return;
+        }
+
+        const v = data?.vehicle ?? data; // por si tu back retorna {vehicle} o directo
+        setForm({
+          plate: String(v?.plate ?? ""),
+          brand: String(v?.brand ?? ""),
+          model: String(v?.model ?? ""),
+          year: String(v?.year ?? ""),
+        });
+      } catch (e) {
+        setFormError("No se pudo conectar con el servidor.");
+      } finally {
+        setLoadingData(false);
+      }
+    }
+
+    load();
+  }, [id]);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSuccessMsg(null);
     setFormError(null);
+
+    if (!id) {
+      setFormError("Falta el ID del vehículo.");
+      return;
+    }
 
     if (!validateLocal()) return;
 
@@ -112,8 +156,8 @@ export default function VehiclesCreatePage() {
         year: Number(form.year),
       };
 
-      const res = await fetch(`${API_URL}/vehicles`, {
-        method: "POST",
+      const res = await fetch(`${API_URL}/vehicles/${id}`, {
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -126,17 +170,12 @@ export default function VehiclesCreatePage() {
       if (!res.ok) {
         const messages = normalizeMessage(data?.message);
         const mapped = mapBackendErrorsToFields(messages);
-
-        // merge con lo que ya haya (por si quieres)
         setErrors((prev) => ({ ...prev, ...mapped.fieldErrors }));
         setFormError(mapped.formError ?? null);
         return;
       }
 
-      setSuccessMsg(data?.message ?? "Vehículo creado con éxito");
-      // puedes limpiar el form si quieres:
-      setForm({ plate: "", brand: "", model: "", year: "" });
-      setErrors({});
+      setSuccessMsg(data?.message ?? "Vehículo actualizado con éxito");
     } catch (err: any) {
       setFormError("No se pudo conectar con el servidor.");
     } finally {
@@ -148,8 +187,8 @@ export default function VehiclesCreatePage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
       <header className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Registrar vehículo</h1>
-          <p className="text-sm text-slate-400">Placa, marca, modelo y año son obligatorios.</p>
+          <h1 className="text-2xl font-semibold">Editar vehículo</h1>
+          <p className="text-sm text-slate-400">Actualiza placa, marca, modelo y año.</p>
         </div>
 
         <button
@@ -174,62 +213,66 @@ export default function VehiclesCreatePage() {
           </div>
         )}
 
-        <form onSubmit={onSubmit} className="space-y-4">
-          <div>
-            <label className="text-sm text-slate-300">Placa</label>
-            <input
-              name="plate"
-              value={form.plate}
-              onChange={onChange}
-              placeholder="Ej: ABC123"
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 outline-none focus:border-slate-600"
-            />
-            {errors.plate && <p className="mt-2 text-xs text-red-300">{errors.plate}</p>}
-          </div>
+        {loadingData ? (
+          <p className="text-sm text-slate-400">Cargando vehículo...</p>
+        ) : (
+          <form onSubmit={onSubmit} className="space-y-4">
+            <div>
+              <label className="text-sm text-slate-300">Placa</label>
+              <input
+                name="plate"
+                value={form.plate}
+                onChange={onChange}
+                placeholder="Ej: ABC123"
+                className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 outline-none focus:border-slate-600"
+              />
+              {errors.plate && <p className="mt-2 text-xs text-red-300">{errors.plate}</p>}
+            </div>
 
-          <div>
-            <label className="text-sm text-slate-300">Marca</label>
-            <input
-              name="brand"
-              value={form.brand}
-              onChange={onChange}
-              placeholder="Ej: Toyota"
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 outline-none focus:border-slate-600"
-            />
-            {errors.brand && <p className="mt-2 text-xs text-red-300">{errors.brand}</p>}
-          </div>
+            <div>
+              <label className="text-sm text-slate-300">Marca</label>
+              <input
+                name="brand"
+                value={form.brand}
+                onChange={onChange}
+                placeholder="Ej: Toyota"
+                className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 outline-none focus:border-slate-600"
+              />
+              {errors.brand && <p className="mt-2 text-xs text-red-300">{errors.brand}</p>}
+            </div>
 
-          <div>
-            <label className="text-sm text-slate-300">Modelo</label>
-            <input
-              name="model"
-              value={form.model}
-              onChange={onChange}
-              placeholder="Ej: Corolla"
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 outline-none focus:border-slate-600"
-            />
-            {errors.model && <p className="mt-2 text-xs text-red-300">{errors.model}</p>}
-          </div>
+            <div>
+              <label className="text-sm text-slate-300">Modelo</label>
+              <input
+                name="model"
+                value={form.model}
+                onChange={onChange}
+                placeholder="Ej: Corolla"
+                className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 outline-none focus:border-slate-600"
+              />
+              {errors.model && <p className="mt-2 text-xs text-red-300">{errors.model}</p>}
+            </div>
 
-          <div>
-            <label className="text-sm text-slate-300">Año</label>
-            <input
-              name="year"
-              value={form.year}
-              onChange={onChange}
-              placeholder="Ej: 2021"
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 outline-none focus:border-slate-600"
-            />
-            {errors.year && <p className="mt-2 text-xs text-red-300">{errors.year}</p>}
-          </div>
+            <div>
+              <label className="text-sm text-slate-300">Año</label>
+              <input
+                name="year"
+                value={form.year}
+                onChange={onChange}
+                placeholder="Ej: 2021"
+                className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 outline-none focus:border-slate-600"
+              />
+              {errors.year && <p className="mt-2 text-xs text-red-300">{errors.year}</p>}
+            </div>
 
-          <button
-            disabled={loading}
-            className="w-full rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 hover:bg-white transition disabled:opacity-60 cursor-pointer"
-          >
-            {loading ? "Guardando..." : "Guardar vehículo"}
-          </button>
-        </form>
+            <button
+              disabled={loading}
+              className="w-full rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 hover:bg-white transition disabled:opacity-60 cursor-pointer"
+            >
+              {loading ? "Actualizando..." : "Actualizar vehículo"}
+            </button>
+          </form>
+        )}
       </section>
     </div>
   );
