@@ -5,6 +5,8 @@ import VehiclesCreatePage from "./pages/VehiclesCreatePage";
 import VehiclesEditPage from "./pages/VehiclesEditPage";
 import VehiclesDocumentsPage from "./pages/VehiclesDocumentsPage";
 import { RequireAuth } from "./auth/RequireAuth";
+import ClientsPage from "./pages/ClientsPage";
+import ClientsCreatePage from "./pages/ClientsCreatePage";
 
 export default function App() {
   return (
@@ -38,6 +40,8 @@ export default function App() {
         }
       />
 
+<Route path="/clients" element={<ClientsPage />} />
+<Route path="/clients/new" element={<ClientsCreatePage />} />
       <Route
         path="/vehicles/:id/documents"
         element={
