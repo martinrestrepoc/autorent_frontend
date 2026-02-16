@@ -3,6 +3,7 @@ import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import VehiclesCreatePage from "./pages/VehiclesCreatePage";
 import VehiclesEditPage from "./pages/VehiclesEditPage";
+import VehiclesDocumentsPage from "./pages/VehiclesDocumentsPage";
 import { RequireAuth } from "./auth/RequireAuth";
 
 export default function App() {
@@ -33,6 +34,15 @@ export default function App() {
         element={
           <RequireAuth>
             <VehiclesEditPage />
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/vehicles/:id/documents"
+        element={
+          <RequireAuth>
+            <VehiclesDocumentsPage />
           </RequireAuth>
         }
       />

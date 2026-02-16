@@ -116,14 +116,14 @@ export default function VehiclesEditPage() {
           return;
         }
 
-        const v = data?.vehicle ?? data; // por si tu back retorna {vehicle} o directo
+        const v = data?.vehicle ?? data;
         setForm({
           plate: String(v?.plate ?? ""),
           brand: String(v?.brand ?? ""),
           model: String(v?.model ?? ""),
           year: String(v?.year ?? ""),
         });
-      } catch (e) {
+      } catch {
         setFormError("No se pudo conectar con el servidor.");
       } finally {
         setLoadingData(false);
@@ -176,7 +176,7 @@ export default function VehiclesEditPage() {
       }
 
       setSuccessMsg(data?.message ?? "Vehículo actualizado con éxito");
-    } catch (err: any) {
+    } catch {
       setFormError("No se pudo conectar con el servidor.");
     } finally {
       setLoading(false);
@@ -191,13 +191,25 @@ export default function VehiclesEditPage() {
           <p className="text-sm text-slate-400">Actualiza placa, marca, modelo y año.</p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => navigate("/")}
-          className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-white transition cursor-pointer"
-        >
-          Volver
-        </button>
+        <div className="flex items-center gap-2">
+          {id && (
+            <button
+              type="button"
+              onClick={() => navigate(`/vehicles/${id}/documents`)}
+              className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-900/60 transition cursor-pointer"
+            >
+              Subir documento
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-white transition cursor-pointer"
+          >
+            Volver
+          </button>
+        </div>
       </header>
 
       <section className="max-w-xl rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
