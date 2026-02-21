@@ -7,6 +7,7 @@ import VehiclesDocumentsPage from "./pages/VehiclesDocumentsPage";
 import { RequireAuth } from "./auth/RequireAuth";
 import ClientsPage from "./pages/ClientsPage";
 import ClientsCreatePage from "./pages/ClientsCreatePage";
+import RentalsCreatePage from "./pages/RentalsCreatePage";
 
 export default function App() {
   return (
@@ -50,6 +51,9 @@ export default function App() {
           </RequireAuth>
         }
       />
+
+      <Route path="/rentals/new" element={<RentalsCreatePage />} />
+
     </Routes>
   );
 }

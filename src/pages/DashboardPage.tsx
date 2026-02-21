@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 import { getToken } from "../auth/token";
 import ClientsPage from "./ClientsPage";
-
+import RentalsPage from "./RentalsPage";
 
 type Vehicle = {
   _id: string;
@@ -220,18 +220,9 @@ export default function DashboardPage() {
           )}
         </section>
       )}
-
-      {activeSection === "rentals" && (
-        <section className="rounded-2xl border border-slate-800 bg-slate-900/20 p-6">
-          <h2 className="text-lg font-medium">Alquileres</h2>
-          <p className="mt-2 text-sm text-slate-400">
-            Esta sección está lista para conectarse cuando implementes los
-            endpoints de alquileres.
-          </p>
-        </section>
-      )}
-
       
+      {activeSection === "rentals" && <RentalsPage />}
+
       {activeSection === "clients" && <ClientsPage />}
 
     </div>
