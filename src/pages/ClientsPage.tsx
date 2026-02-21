@@ -66,7 +66,12 @@ export default function ClientsPage() {
       await loadClients();
       setMode("list");
     } catch (e: any) {
-      setError(e?.response?.data?.message || "Error creando cliente");
+      const msg = e?.response?.data?.message;
+      if (Array.isArray(msg)) {
+        setError(msg.join(" • "));
+      } else {
+        setError(msg || "Error creando cliente");
+      }    
     }
   };
 
@@ -105,7 +110,12 @@ export default function ClientsPage() {
       setMode("list");
       setSelectedId(null);
     } catch (e: any) {
-      setError(e?.response?.data?.message || "Error actualizando cliente");
+      const msg = e?.response?.data?.message;
+      if (Array.isArray(msg)) {
+        setError(msg.join(" • "));
+      } else {
+        setError(msg || "Error actualizando cliente");
+      }
     }
   };
 
