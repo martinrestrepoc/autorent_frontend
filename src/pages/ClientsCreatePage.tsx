@@ -4,6 +4,7 @@ import { http } from "../api/http";
 
 export default function ClientsCreatePage() {
   const navigate = useNavigate();
+
   const [form, setForm] = useState({
     fullName: "",
     documentType: "CC",
@@ -11,80 +12,143 @@ export default function ClientsCreatePage() {
     phone: "",
     email: "",
   });
-  const [error, setError] = useState("");
 
-  const onChange = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const onChange = (k: string, v: string) =>
+    setForm((p) => ({ ...p, [k]: v }));
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
     try {
+      setSaving(true);
       await http.post("/clients", form);
       navigate("/clients");
     } catch (e: any) {
-      setError(e?.response?.data?.message || "Error creando cliente");
+      const msg = e?.response?.data?.message;
+      setError(Array.isArray(msg) ? msg.join(" • ") : msg || "Error creando cliente");
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-4">
-        <h1 className="text-xl font-semibold text-slate-100">Nuevo cliente</h1>
-        <p className="text-sm text-slate-400">Registra un cliente para alquilar vehículos.</p>
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-white">
+            Nuevo cliente
+          </h1>
+          <p className="mt-1 text-sm text-slate-400">
+            Registra un cliente para alquilar vehículos.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => navigate("/clients")}
+          className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+        >
+          Volver
+        </button>
       </div>
 
+      {/* Error */}
       {error && (
-        <div className="mb-4 rounded-xl border border-red-900/40 bg-red-900/20 p-3 text-sm text-red-200">
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           {error}
         </div>
       )}
 
-      <form onSubmit={onSubmit} className="max-w-xl rounded-2xl border border-slate-800 bg-slate-900/20 p-5 space-y-3">
-        <div>
-          <label className="text-xs text-slate-300">Nombre completo</label>
-          <input className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950/40 p-2 text-slate-100"
-            value={form.fullName} onChange={(e) => onChange("fullName", e.target.value)} required />
-        </div>
+      {/* Form */}
+      <form
+        onSubmit={onSubmit}
+        className="max-w-2xl rounded-2xl border border-white/10 bg-white/5 p-6"
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {/* Full name */}
+          <div className="md:col-span-2">
+            <label className="text-xs text-slate-300">Nombre completo</label>
+            <input
+              className="mt-1 w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none focus:border-white/25"
+              value={form.fullName}
+              onChange={(e) => onChange("fullName", e.target.value)}
+              placeholder="Ej: Juan Pérez"
+              required
+            />
+          </div>
 
-        <div className="grid grid-cols-2 gap-3">
+          {/* Doc type */}
           <div>
             <label className="text-xs text-slate-300">Tipo documento</label>
-            <select className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950/40 p-2 text-slate-100"
-              value={form.documentType} onChange={(e) => onChange("documentType", e.target.value)} required>
+            <select
+              className="mt-1 w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2.5 text-sm text-white outline-none focus:border-white/25"
+              value={form.documentType}
+              onChange={(e) => onChange("documentType", e.target.value)}
+              required
+            >
               <option value="CC">CC</option>
               <option value="CE">CE</option>
               <option value="PAS">PAS</option>
             </select>
           </div>
 
+          {/* Doc number */}
           <div>
             <label className="text-xs text-slate-300">Número documento</label>
-            <input className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950/40 p-2 text-slate-100"
-              value={form.documentNumber} onChange={(e) => onChange("documentNumber", e.target.value)} required />
+            <input
+              className="mt-1 w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none focus:border-white/25"
+              value={form.documentNumber}
+              onChange={(e) => onChange("documentNumber", e.target.value)}
+              placeholder="Ej: 123456789"
+              required
+            />
           </div>
-        </div>
 
-        <div className="grid grid-cols-2 gap-3">
+          {/* Phone */}
           <div>
             <label className="text-xs text-slate-300">Teléfono</label>
-            <input className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950/40 p-2 text-slate-100"
-              value={form.phone} onChange={(e) => onChange("phone", e.target.value)} required />
+            <input
+              className="mt-1 w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none focus:border-white/25"
+              value={form.phone}
+              onChange={(e) => onChange("phone", e.target.value)}
+              placeholder="Ej: 3001234567"
+              required
+            />
           </div>
 
+          {/* Email */}
           <div>
             <label className="text-xs text-slate-300">Email</label>
-            <input type="email" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950/40 p-2 text-slate-100"
-              value={form.email} onChange={(e) => onChange("email", e.target.value)} required />
+            <input
+              type="email"
+              className="mt-1 w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none focus:border-white/25"
+              value={form.email}
+              onChange={(e) => onChange("email", e.target.value)}
+              placeholder="Ej: cliente@email.com"
+              required
+            />
           </div>
         </div>
 
-        <div className="flex gap-2 pt-2">
-          <button className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900">
-            Guardar
+        {/* Actions */}
+        <div className="mt-6 flex flex-wrap gap-2">
+          <button
+            disabled={saving}
+            className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:opacity-90 disabled:opacity-60"
+          >
+            {saving ? "Guardando..." : "Guardar"}
           </button>
-          <button type="button" onClick={() => navigate("/clients")}
-            className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200">
+
+          <button
+            type="button"
+            onClick={() => navigate("/clients")}
+            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+          >
             Cancelar
           </button>
         </div>

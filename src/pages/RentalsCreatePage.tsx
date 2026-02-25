@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getToken } from "../auth/token";
 
@@ -15,6 +15,14 @@ type Vehicle = {
   status?: string;
 };
 
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+
+function normalizeMessage(msg: any): string[] {
+  if (Array.isArray(msg)) return msg.map(String);
+  if (typeof msg === "string") return [msg];
+  return ["Error inesperado"];
+}
+
 export default function RentalsCreatePage() {
   const navigate = useNavigate();
 
@@ -26,38 +34,74 @@ export default function RentalsCreatePage() {
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
 
+  const [loadingInit, setLoadingInit] = useState(true);
   const [loading, setLoading] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const inputBase =
+    "mt-1 w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none focus:border-white/25";
+
+  async function fetchJSON(path: string) {
+    const token = getToken();
+    const res = await fetch(`${API_URL}${path}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = normalizeMessage(data?.message)[0] ?? `Error ${res.status} en ${path}`;
+      throw new Error(msg);
+    }
+    return data;
+  }
 
   async function loadInitialData() {
-    const token = getToken();
+    setError(null);
+    setLoadingInit(true);
 
-    const [clientsRes, vehiclesRes] = await Promise.all([
-      fetch("http://localhost:3000/clients", {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-      fetch("http://localhost:3000/vehicles", {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-    ]);
-    const vehiclesData = await vehiclesRes.json();
-    setVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
+    try {
+      const [clientsData, vehiclesData] = await Promise.all([
+        fetchJSON("/clients"),
+        fetchJSON("/vehicles"),
+      ]);
 
-    const clientsData = await clientsRes.json();
-    setClients(
-        Array.isArray(clientsData.clients)
-        ? clientsData.clients
-        : []
-    );
+      // clients: puede venir { clients: [] }
+      setClients(Array.isArray(clientsData?.clients) ? clientsData.clients : []);
 
+      // vehicles: puede venir array directo o { vehicles: [] }
+      const vList = Array.isArray(vehiclesData) ? vehiclesData : (vehiclesData?.vehicles ?? []);
+      setVehicles(Array.isArray(vList) ? vList : []);
+    } catch (e) {
+      setError((e as Error).message);
+      setClients([]);
+      setVehicles([]);
+    } finally {
+      setLoadingInit(false);
+    }
   }
 
   useEffect(() => {
     loadInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const availableVehicles = useMemo(() => {
+    // Si tu backend usa AVAILABLE, perfecto. Si no, igual mostramos todos.
+    const hasStatus = vehicles.some((v) => typeof v.status === "string");
+    if (!hasStatus) return vehicles;
+
+    return vehicles.filter((v) => (v.status ?? "").toUpperCase() === "AVAILABLE");
+  }, [vehicles]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
+    setSuccessMsg(null);
 
     if (!cliente || !vehiculo || !fechaInicio || !fechaFin) {
       setError("Todos los campos son obligatorios");
@@ -70,32 +114,28 @@ export default function RentalsCreatePage() {
     }
 
     try {
-      setError(null);
       setLoading(true);
 
       const token = getToken();
-
-      const res = await fetch("http://localhost:3000/alquileres", {
+      const res = await fetch(`${API_URL}/alquileres`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({
-          cliente,
-          vehiculo,
-          fechaInicio,
-          fechaFin,
-        }),
+        body: JSON.stringify({ cliente, vehiculo, fechaInicio, fechaFin }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(data.message || "Error creando alquiler");
+        const msg = normalizeMessage(data?.message)[0] ?? "Error creando alquiler";
+        throw new Error(msg);
       }
 
-      navigate("/");
+      setSuccessMsg(data?.message ?? "Alquiler creado con éxito");
+      // manda a la lista
+      navigate("/rentals");
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -104,99 +144,136 @@ export default function RentalsCreatePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
-      <div className="max-w-3xl mx-auto rounded-2xl border border-slate-800 bg-slate-900/20 p-6">
-        <h2 className="text-lg font-medium mb-6">Crear nuevo alquiler</h2>
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-white">
+            Crear nuevo alquiler
+          </h1>
+          <p className="mt-1 text-sm text-slate-400">
+            Selecciona cliente, vehículo disponible y rango de fechas.
+          </p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <button
+          type="button"
+          onClick={() => navigate("/rentals")}
+          className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+        >
+          Volver a alquileres
+        </button>
+      </div>
 
-          <div>
-            <label className="block text-sm mb-1 text-slate-400">
-              Cliente
-            </label>
-            <select
-              value={cliente}
-              onChange={(e) => setCliente(e.target.value)}
-              className="w-full rounded-lg bg-slate-950 border border-slate-700 p-2 text-sm"
-            >
-              <option value="">Seleccionar cliente</option>
-              {clients.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.fullName} - {c.email}
-                </option>
-              ))}
-            </select>
+      {/* Alerts */}
+      {error && (
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+          {error}
+        </div>
+      )}
+
+      {successMsg && (
+        <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-sm text-emerald-200">
+          {successMsg}
+        </div>
+      )}
+
+      {/* Card */}
+      <section className="max-w-3xl rounded-2xl border border-white/10 bg-white/5 p-6">
+        {loadingInit ? (
+          <div className="animate-pulse space-y-4">
+            <div className="h-10 w-full rounded-xl bg-white/10" />
+            <div className="h-10 w-full rounded-xl bg-white/10" />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="h-10 w-full rounded-xl bg-white/10" />
+              <div className="h-10 w-full rounded-xl bg-white/10" />
+            </div>
+            <div className="h-11 w-44 rounded-xl bg-white/10" />
           </div>
-
-          <div>
-            <label className="block text-sm mb-1 text-slate-400">
-              Vehículo
-            </label>
-            <select
-              value={vehiculo}
-              onChange={(e) => setVehiculo(e.target.value)}
-              className="w-full rounded-lg bg-slate-950 border border-slate-700 p-2 text-sm"
-            >
-              <option value="">Seleccionar vehículo</option>
-              {vehicles
-                .filter((v) => v.status === "AVAILABLE")
-                .map((v) => (
-                  <option key={v._id} value={v._id}>
-                    {v.plate} - {v.brand}
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-xs text-slate-300">Cliente</label>
+              <select
+                value={cliente}
+                onChange={(e) => setCliente(e.target.value)}
+                className={inputBase}
+              >
+                <option value="">Seleccionar cliente</option>
+                {clients.map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.fullName} - {c.email}
                   </option>
                 ))}
-            </select>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm mb-1 text-slate-400">
-                Fecha inicio
-              </label>
-              <input
-                type="date"
-                value={fechaInicio}
-                onChange={(e) => setFechaInicio(e.target.value)}
-                className="w-full rounded-lg bg-slate-950 border border-slate-700 p-2 text-sm"
-              />
+              </select>
             </div>
 
             <div>
-              <label className="block text-sm mb-1 text-slate-400">
-                Fecha fin
-              </label>
-              <input
-                type="date"
-                value={fechaFin}
-                onChange={(e) => setFechaFin(e.target.value)}
-                className="w-full rounded-lg bg-slate-950 border border-slate-700 p-2 text-sm"
-              />
+              <label className="block text-xs text-slate-300">Vehículo</label>
+              <select
+                value={vehiculo}
+                onChange={(e) => setVehiculo(e.target.value)}
+                className={inputBase}
+              >
+                <option value="">Seleccionar vehículo</option>
+
+                {(availableVehicles.length > 0 ? availableVehicles : vehicles).map((v) => (
+                  <option key={v._id} value={v._id}>
+                    {v.plate} - {v.brand}
+                    {v.status ? ` (${v.status})` : ""}
+                  </option>
+                ))}
+              </select>
+
+              {vehicles.length > 0 && availableVehicles.length === 0 && (
+                <p className="mt-2 text-xs text-amber-200/90">
+                  Nota: No se detectaron vehículos con estado AVAILABLE, por eso se muestran todos.
+                </p>
+              )}
             </div>
-          </div>
 
-          {error && (
-            <p className="text-sm text-red-400">{error}</p>
-          )}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-xs text-slate-300">Fecha inicio</label>
+                <input
+                  type="date"
+                  value={fechaInicio}
+                  onChange={(e) => setFechaInicio(e.target.value)}
+                  className={inputBase}
+                />
+              </div>
 
-          <div className="flex justify-end gap-2 pt-4">
-            <button
-              type="button"
-              onClick={() => navigate("/")}
-              className="rounded-lg border border-slate-700 px-4 py-2 text-sm hover:bg-slate-900/60"
-            >
-              Cancelar
-            </button>
+              <div>
+                <label className="block text-xs text-slate-300">Fecha fin</label>
+                <input
+                  type="date"
+                  value={fechaFin}
+                  onChange={(e) => setFechaFin(e.target.value)}
+                  className={inputBase}
+                />
+              </div>
+            </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-white"
-            >
-              {loading ? "Creando..." : "Crear alquiler"}
-            </button>
-          </div>
-        </form>
-      </div>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:opacity-90 disabled:opacity-60"
+              >
+                {loading ? "Creando..." : "Crear alquiler"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate("/rentals")}
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
+        )}
+      </section>
     </div>
   );
 }

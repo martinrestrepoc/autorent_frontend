@@ -1,9 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../auth/useAuth";
 import { getToken } from "../auth/token";
-import ClientsPage from "./ClientsPage";
-import RentalsPage from "./RentalsPage";
 
 type Vehicle = {
   _id: string;
@@ -14,217 +11,340 @@ type Vehicle = {
   status?: string;
 };
 
-type DashboardSection = "home" | "vehicles" | "rentals" | "clients";
+type Client = {
+  _id: string;
+  fullName?: string;
+  email?: string;
+  documentNumber?: string;
+};
+
+type Rental = {
+  _id: string;
+};
+
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000"; // ✅
+
+function StatCard({
+  label,
+  value,
+  hint,
+  onClick,
+}: {
+  label: string;
+  value: string | number;
+  hint: string;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="text-left rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:bg-white/10 hover:border-white/15"
+    >
+      <p className="text-xs text-slate-400">{label}</p>
+      <p className="mt-2 text-3xl font-semibold tracking-tight text-white">
+        {value}
+      </p>
+      <p className="mt-2 text-sm text-slate-400">{hint}</p>
+    </button>
+  );
+}
+
+function SkeletonRow() {
+  return (
+    <div className="animate-pulse rounded-xl border border-white/10 bg-white/5 p-4">
+      <div className="h-3 w-32 rounded bg-white/10" />
+      <div className="mt-3 h-3 w-48 rounded bg-white/10" />
+    </div>
+  );
+}
 
 export default function DashboardPage() {
-  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const [activeSection, setActiveSection] = useState<DashboardSection>("home");
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [hasLoadedVehicles, setHasLoadedVehicles] = useState(false);
-  const [loadingVehicles, setLoadingVehicles] = useState(false);
-  const [vehiclesError, setVehiclesError] = useState<string | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [rentalsCount, setRentalsCount] = useState<number>(0); // ✅
 
-  async function loadVehicles() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  async function fetchJSON(path: string) {
+    const token = getToken();
+
+    const res = await fetch(`${API_URL}${path}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.message || `Error ${res.status} cargando ${path}`);
+    return data;
+  }
+
+  async function loadDashboard() {
     try {
-      setVehiclesError(null);
-      setLoadingVehicles(true);
+      setError(null);
+      setLoading(true);
 
-      const token = getToken();
-      const res = await fetch("http://localhost:3000/vehicles", {
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
+      // ✅ ahora también traemos alquileres
+      const [vData, cData, rData] = await Promise.all([
+        fetchJSON("/vehicles"),
+        fetchJSON("/clients"),
+        fetchJSON("/alquileres"),
+      ]);
 
-      if (!res.ok) throw new Error("No se pudo cargar vehículos");
+      // vehicles: normalmente array directo
+      const vehiclesList = Array.isArray(vData) ? vData : (vData?.vehicles ?? []);
+      setVehicles(Array.isArray(vehiclesList) ? vehiclesList : []);
 
-      const data = await res.json();
-      setVehicles(Array.isArray(data) ? data : []);
-      setHasLoadedVehicles(true);
+      // ✅ clients: viene como { clients: [...] }
+      const clientsList = Array.isArray(cData?.clients) ? cData.clients : (Array.isArray(cData) ? cData : []);
+      setClients(clientsList);
+
+      // ✅ alquileres: normalmente array directo (o { alquileres: [] } / { rentals: [] })
+      const rentalsList: Rental[] = Array.isArray(rData)
+        ? rData
+        : (rData?.alquileres ?? rData?.rentals ?? []);
+      setRentalsCount(Array.isArray(rentalsList) ? rentalsList.length : 0);
+
     } catch (e) {
-      setVehiclesError("Error cargando vehículos: " + (e as Error).message);
+      setError((e as Error).message);
       setVehicles([]);
+      setClients([]);
+      setRentalsCount(0);
     } finally {
-      setLoadingVehicles(false);
+      setLoading(false);
     }
   }
 
   useEffect(() => {
-    if (activeSection === "vehicles" && !hasLoadedVehicles) {
-      loadVehicles();
+    loadDashboard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const totalVehicles = vehicles.length;
+  const totalClients = clients.length;
+
+  const vehiclesByStatus = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const v of vehicles) {
+      const key = (v.status || "SIN_ESTADO").toUpperCase();
+      map.set(key, (map.get(key) || 0) + 1);
     }
-  }, [activeSection, hasLoadedVehicles]);
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+  }, [vehicles]);
+
+  const lastVehicles = useMemo(() => vehicles.slice(0, 5), [vehicles]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
+    <div className="space-y-6">
       {/* Header */}
-      <header className="mb-8 flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Autorent Admin</h1>
-          <p className="text-sm text-slate-400">Bienvenido, {user?.email}</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-white">
+            Dashboard
+          </h1>
+          <p className="mt-1 text-sm text-slate-400">
+            Resumen general del sistema: flota, clientes y alquileres.
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {activeSection !== "home" && (
-            <button
-              onClick={() => setActiveSection("home")}
-              className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-900/60 transition cursor-pointer"
-            >
-              Inicio
-            </button>
-          )}
-
+        <div className="flex flex-wrap gap-2">
           <button
-            onClick={logout}
-            className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-white transition cursor-pointer"
+            onClick={() => navigate("/vehicles/new")}
+            className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:opacity-90"
           >
-            Logout
+            + Nuevo vehículo
+          </button>
+          <button
+            onClick={() => navigate("/clients/new")}
+            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+          >
+            + Nuevo cliente
+          </button>
+          <button
+            onClick={() => navigate("/rentals/new")}
+            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+          >
+            + Nuevo alquiler
+          </button>
+          <button
+            onClick={loadDashboard}
+            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+          >
+            Refrescar
           </button>
         </div>
-      </header>
+      </div>
 
-      {activeSection === "home" && (
-        <section className="rounded-2xl border border-slate-800 bg-slate-900/20 p-6">
-          <h2 className="text-lg font-medium">¿Qué deseas gestionar hoy?</h2>
+      {/* Error */}
+      {error && (
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5">
+          <p className="text-sm font-medium text-red-200">
+            No se pudo cargar el dashboard
+          </p>
+          <p className="mt-1 text-sm text-red-200/80">{error}</p>
+        </div>
+      )}
+
+      {/* KPIs */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <StatCard
+          label="Vehículos registrados"
+          value={loading ? "—" : totalVehicles}
+          hint="Flota total disponible en el sistema."
+          onClick={() => navigate("/vehicles")}
+        />
+        <StatCard
+          label="Clientes registrados"
+          value={loading ? "—" : totalClients}
+          hint="Base total de clientes."
+          onClick={() => navigate("/clients")}
+        />
+        {/* ✅ reemplazo: Estados de flota -> Alquileres */}
+        <StatCard
+          label="Alquileres"
+          value={loading ? "—" : rentalsCount}
+          hint="Contratos registrados en el sistema."
+          onClick={() => navigate("/rentals")}
+        />
+      </div>
+
+      {/* Panels */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Últimos vehículos */}
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-white">
+                Últimos vehículos
+              </h2>
+              <p className="mt-1 text-sm text-slate-400">
+                Vista rápida de la flota más reciente.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate("/vehicles")}
+              className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+            >
+              Gestionar
+            </button>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            {loading && (
+              <>
+                <SkeletonRow />
+                <SkeletonRow />
+                <SkeletonRow />
+              </>
+            )}
+
+            {!loading && lastVehicles.length === 0 && (
+              <div className="rounded-xl border border-white/10 bg-black/20 p-5">
+                <p className="text-sm text-slate-300">No hay vehículos aún.</p>
+                <p className="mt-1 text-sm text-slate-400">
+                  Crea el primero para empezar a operar.
+                </p>
+                <button
+                  onClick={() => navigate("/vehicles/new")}
+                  className="mt-4 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:opacity-90"
+                >
+                  + Crear vehículo
+                </button>
+              </div>
+            )}
+
+            {!loading &&
+              lastVehicles.map((v) => (
+                <div
+                  key={v._id}
+                  className="rounded-xl border border-white/10 bg-black/20 p-4 transition hover:bg-black/30"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        {v.plate} · {v.brand} {v.model} ({v.year})
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Estado:{" "}
+                        <span className="text-slate-300">
+                          {v.status ?? "—"}
+                        </span>
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => navigate(`/vehicles/${v._id}/documents`)}
+                        className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/10"
+                      >
+                        Docs
+                      </button>
+                      <button
+                        onClick={() => navigate(`/vehicles/${v._id}/edit`)}
+                        className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/10"
+                      >
+                        Editar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </section>
+
+        {/* Distribución por estado */}
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
+          <h2 className="text-base font-semibold text-white">
+            Distribución por estado
+          </h2>
           <p className="mt-1 text-sm text-slate-400">
-            Elige una sección para continuar.
+            Resumen rápido de cómo está la flota.
           </p>
 
-          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-            <button
-              onClick={() => setActiveSection("vehicles")}
-              className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 text-left hover:bg-slate-900/60 transition cursor-pointer"
-            >
-              <p className="text-sm text-slate-400">Vehículos</p>
-              <p className="mt-2 text-xl font-semibold">Gestión de flota</p>
-              <p className="text-xs text-slate-500 mt-1">
-                Crear, editar y consultar carros.
-              </p>
-            </button>
+          <div className="mt-5 space-y-3">
+            {loading && (
+              <>
+                <SkeletonRow />
+                <SkeletonRow />
+                <SkeletonRow />
+              </>
+            )}
 
-            <button
-              onClick={() => setActiveSection("rentals")}
-              className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 text-left hover:bg-slate-900/60 transition cursor-pointer"
-            >
-              <p className="text-sm text-slate-400">Alquileres</p>
-              <p className="mt-2 text-xl font-semibold">Operación diaria</p>
-              <p className="text-xs text-slate-500 mt-1">
-                Ver contratos activos y cerrados.
-              </p>
-            </button>
+            {!loading && vehiclesByStatus.length === 0 && (
+              <div className="rounded-xl border border-white/10 bg-black/20 p-5">
+                <p className="text-sm text-slate-300">
+                  Sin datos de estado por ahora.
+                </p>
+                <p className="mt-1 text-sm text-slate-400">
+                  Cuando registres vehículos, verás su estado aquí.
+                </p>
+              </div>
+            )}
 
-            <button
-              onClick={() => setActiveSection("clients")}
-              className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 text-left hover:bg-slate-900/60 transition cursor-pointer"
-            >
-              <p className="text-sm text-slate-400">Clientes</p>
-              <p className="mt-2 text-xl font-semibold">Base de clientes</p>
-              <p className="text-xs text-slate-500 mt-1">
-                Consultar información de usuarios.
-              </p>
-            </button>
+            {!loading &&
+              vehiclesByStatus.map(([status, count]) => (
+                <div
+                  key={status}
+                  className="flex items-center justify-between rounded-xl border border-white/10 bg-black/20 p-4"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-white">{status}</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Vehículos en este estado
+                    </p>
+                  </div>
+                  <span className="rounded-xl bg-white/10 px-3 py-1 text-sm font-semibold text-white ring-1 ring-white/15">
+                    {count}
+                  </span>
+                </div>
+              ))}
           </div>
         </section>
-      )}
-
-      {activeSection === "vehicles" && (
-        <section className="rounded-2xl border border-slate-800 bg-slate-900/20 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-lg font-medium">Vehículos registrados</h2>
-              <p className="text-sm text-slate-400">
-                Lista completa de carros creados en el sistema.
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => navigate("/vehicles/new")}
-                className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-white transition cursor-pointer"
-              >
-                + Nuevo
-              </button>
-
-              <button
-                onClick={loadVehicles}
-                className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-900/50 transition cursor-pointer"
-              >
-                Refrescar
-              </button>
-            </div>
-          </div>
-
-          {loadingVehicles && (
-            <p className="text-sm text-slate-400">Cargando...</p>
-          )}
-
-          {vehiclesError && (
-            <p className="text-sm text-red-400">{vehiclesError}</p>
-          )}
-
-          {!loadingVehicles && !vehiclesError && vehicles.length === 0 && (
-            <p className="text-sm text-slate-400">
-              No hay vehículos todavía. Crea el primero con “+ Nuevo”.
-            </p>
-          )}
-
-          {!loadingVehicles && vehicles.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-slate-300">
-                  <tr className="border-b border-slate-800">
-                    <th className="text-left py-3">Placa</th>
-                    <th className="text-left py-3">Marca</th>
-                    <th className="text-left py-3">Modelo</th>
-                    <th className="text-left py-3">Año</th>
-                    <th className="text-left py-3">Estado</th>
-                    <th className="text-right py-3">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vehicles.map((v) => (
-                    <tr
-                      key={v._id}
-                      className="border-b border-slate-900/60 hover:bg-slate-900/30 transition"
-                    >
-                      <td className="py-3 font-medium">{v.plate}</td>
-                      <td className="py-3">{v.brand}</td>
-                      <td className="py-3">{v.model}</td>
-                      <td className="py-3">{v.year}</td>
-                      <td className="py-3">{v.status ?? "—"}</td>
-                      <td className="py-3">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => navigate(`/vehicles/${v._id}/documents`)}
-                            className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-200 hover:bg-slate-900/60 transition cursor-pointer"
-                          >
-                            Documentos
-                          </button>
-
-                        <button
-                          onClick={() => navigate(`/vehicles/${v._id}/edit`)}
-                          className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-200 hover:bg-slate-900/60 transition cursor-pointer"
-                        >
-                          Update
-                        </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      )}
-      
-      {activeSection === "rentals" && <RentalsPage />}
-
-      {activeSection === "clients" && <ClientsPage />}
-
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { http } from "../api/http";
 
 type Client = {
@@ -21,14 +21,49 @@ const emptyForm = {
   email: "",
 };
 
+function cx(...classes: Array<string | false | undefined | null>) {
+  return classes.filter(Boolean).join(" ");
+}
+
+function Badge({ text }: { text: string }) {
+  return (
+    <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-slate-200 ring-1 ring-white/15">
+      {text}
+    </span>
+  );
+}
+
+function SkeletonRow() {
+  return (
+    <tr className="animate-pulse border-t border-white/10">
+      <td className="p-3">
+        <div className="h-3 w-40 rounded bg-white/10" />
+      </td>
+      <td className="p-3">
+        <div className="h-3 w-32 rounded bg-white/10" />
+      </td>
+      <td className="p-3">
+        <div className="h-3 w-24 rounded bg-white/10" />
+      </td>
+      <td className="p-3">
+        <div className="h-3 w-48 rounded bg-white/10" />
+      </td>
+      <td className="p-3 text-right">
+        <div className="ml-auto h-8 w-28 rounded bg-white/10" />
+      </td>
+    </tr>
+  );
+}
+
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const [query, setQuery] = useState("");
+
   const [mode, setMode] = useState<Mode>("list");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-
   const [form, setForm] = useState({ ...emptyForm });
 
   const onChange = (k: keyof typeof form, v: string) =>
@@ -39,7 +74,10 @@ export default function ClientsPage() {
       setError("");
       setLoading(true);
       const { data } = await http.get("/clients");
-      setClients(data.clients ?? []);
+
+      // tu API a veces devuelve data.clients, a veces un array directo.
+      const list = Array.isArray(data) ? data : data.clients ?? [];
+      setClients(list);
     } catch (e: any) {
       setError(e?.response?.data?.message || "Error cargando clientes");
     } finally {
@@ -50,6 +88,20 @@ export default function ClientsPage() {
   useEffect(() => {
     loadClients();
   }, []);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return clients;
+    return clients.filter((c) => {
+      const doc = `${c.documentType} ${c.documentNumber}`.toLowerCase();
+      return (
+        c.fullName?.toLowerCase().includes(q) ||
+        c.email?.toLowerCase().includes(q) ||
+        c.phone?.toLowerCase().includes(q) ||
+        doc.includes(q)
+      );
+    });
+  }, [clients, query]);
 
   // ---------- CREATE ----------
   const startCreate = () => {
@@ -67,11 +119,7 @@ export default function ClientsPage() {
       setMode("list");
     } catch (e: any) {
       const msg = e?.response?.data?.message;
-      if (Array.isArray(msg)) {
-        setError(msg.join(" • "));
-      } else {
-        setError(msg || "Error creando cliente");
-      }    
+      setError(Array.isArray(msg) ? msg.join(" • ") : msg || "Error creando cliente");
     }
   };
 
@@ -81,7 +129,7 @@ export default function ClientsPage() {
       setError("");
       setLoading(true);
       const { data } = await http.get(`/clients/${id}`);
-      const c: Client = data.client;
+      const c: Client = data.client ?? data;
 
       setForm({
         fullName: c.fullName ?? "",
@@ -111,17 +159,13 @@ export default function ClientsPage() {
       setSelectedId(null);
     } catch (e: any) {
       const msg = e?.response?.data?.message;
-      if (Array.isArray(msg)) {
-        setError(msg.join(" • "));
-      } else {
-        setError(msg || "Error actualizando cliente");
-      }
+      setError(Array.isArray(msg) ? msg.join(" • ") : msg || "Error actualizando cliente");
     }
   };
 
   // ---------- DELETE ----------
-  const remove = async (id: string) => {
-    const ok = confirm("¿Eliminar cliente permanentemente?");
+  const remove = async (id: string, name: string) => {
+    const ok = window.confirm(`¿Eliminar a "${name}" permanentemente?`);
     if (!ok) return;
 
     try {
@@ -141,26 +185,29 @@ export default function ClientsPage() {
   };
 
   return (
-    <section className="rounded-2xl border border-slate-800 bg-slate-900/20 p-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h2 className="text-lg font-medium">Clientes</h2>
+          <h1 className="text-2xl font-semibold tracking-tight text-white">
+            Clientes
+          </h1>
           <p className="mt-1 text-sm text-slate-400">
-            Registra, edita y elimina clientes.
+            Registra, busca y gestiona tu base de clientes.
           </p>
         </div>
 
         {mode === "list" ? (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={startCreate}
-              className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900"
+              className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:opacity-90"
             >
-              + Nuevo
+              + Nuevo cliente
             </button>
             <button
               onClick={loadClients}
-              className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200"
+              className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
             >
               Refrescar
             </button>
@@ -168,102 +215,139 @@ export default function ClientsPage() {
         ) : (
           <button
             onClick={cancelForm}
-            className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200"
+            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
           >
             Volver
           </button>
         )}
       </div>
 
+      {/* Error */}
       {error && (
-        <div className="mb-4 rounded-xl border border-red-900/40 bg-red-900/20 p-3 text-sm text-red-200">
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           {error}
         </div>
       )}
 
       {/* LIST */}
       {mode === "list" && (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/10 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-900/40 text-slate-300">
-              <tr>
-                <th className="text-left p-3">Nombre</th>
-                <th className="text-left p-3">Documento</th>
-                <th className="text-left p-3">Teléfono</th>
-                <th className="text-left p-3">Email</th>
-                <th className="text-right p-3">Acciones</th>
-              </tr>
-            </thead>
+        <section className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+          {/* Toolbar */}
+          <div className="flex flex-col gap-3 border-b border-white/10 p-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-2">
+              <Badge text={`${filtered.length} clientes`} />
+              {query.trim() && <Badge text={`Filtro: "${query.trim()}"`} />}
+            </div>
 
-            <tbody className="text-slate-200">
-              {loading ? (
+            <div className="w-full md:w-80">
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar por nombre, email, teléfono o documento..."
+                className="w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-slate-500 outline-none focus:border-white/25"
+              />
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="min-w-[900px] w-full text-sm">
+              <thead className="bg-black/20 text-slate-300">
                 <tr>
-                  <td className="p-3" colSpan={5}>
-                    Cargando...
-                  </td>
+                  <th className="text-left p-3 font-medium">Nombre</th>
+                  <th className="text-left p-3 font-medium">Documento</th>
+                  <th className="text-left p-3 font-medium">Teléfono</th>
+                  <th className="text-left p-3 font-medium">Email</th>
+                  <th className="text-right p-3 font-medium">Acciones</th>
                 </tr>
-              ) : clients.length === 0 ? (
-                <tr>
-                  <td className="p-3" colSpan={5}>
-                    No hay clientes.
-                  </td>
-                </tr>
-              ) : (
-                clients.map((c) => (
-                  <tr key={c._id} className="border-t border-slate-800">
-                    <td className="p-3">{c.fullName}</td>
-                    <td className="p-3">
-                      {c.documentType} {c.documentNumber}
-                    </td>
-                    <td className="p-3">{c.phone}</td>
-                    <td className="p-3">{c.email}</td>
-                    <td className="p-3 text-right">
-                      <button
-                        onClick={() => startEdit(c._id)}
-                        className="mr-2 rounded-lg border border-slate-700 px-3 py-1 text-xs"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => remove(c._id)}
-                        className="rounded-lg border border-red-700/60 px-3 py-1 text-xs text-red-200"
-                      >
-                        Eliminar
-                      </button>
+              </thead>
+
+              <tbody className="text-slate-200">
+                {loading ? (
+                  <>
+                    <SkeletonRow />
+                    <SkeletonRow />
+                    <SkeletonRow />
+                  </>
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td className="p-6 text-slate-400" colSpan={5}>
+                      {clients.length === 0
+                        ? "Aún no tienes clientes. Crea el primero con “+ Nuevo cliente”."
+                        : "No hay resultados con ese filtro."}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  filtered.map((c) => (
+                    <tr
+                      key={c._id}
+                      className="border-t border-white/10 hover:bg-white/5 transition"
+                    >
+                      <td className="p-3 font-medium text-white">
+                        {c.fullName}
+                      </td>
+                      <td className="p-3">
+                        {c.documentType} {c.documentNumber}
+                      </td>
+                      <td className="p-3">{c.phone}</td>
+                      <td className="p-3">{c.email}</td>
+                      <td className="p-3 text-right">
+                        <div className="inline-flex gap-2">
+                          <button
+                            onClick={() => startEdit(c._id)}
+                            className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/10"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => remove(c._id, c.fullName)}
+                            className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-200 transition hover:bg-red-500/15"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
 
-      {/* FORM (CREATE/EDIT) */}
+      {/* FORM */}
       {(mode === "create" || mode === "edit") && (
-        <div className="max-w-xl rounded-2xl border border-slate-800 bg-slate-900/10 p-5 space-y-3">
-          <div className="text-sm text-slate-300">
-            {mode === "create" ? "Crear cliente" : "Editar cliente"}
+        <section className="max-w-2xl rounded-2xl border border-white/10 bg-white/5 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-white">
+                {mode === "create" ? "Crear cliente" : "Editar cliente"}
+              </h2>
+              <p className="mt-1 text-sm text-slate-400">
+                Completa los datos y guarda los cambios.
+              </p>
+            </div>
+
+            <Badge text={mode === "create" ? "Nuevo" : "Edición"} />
           </div>
 
-          <div>
-            <label className="text-xs text-slate-300">Nombre completo</label>
-            <input
-              className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950/40 p-2 text-slate-100"
-              value={form.fullName}
-              onChange={(e) => onChange("fullName", e.target.value)}
-              required
-            />
-          </div>
+          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <label className="text-xs text-slate-300">Nombre completo</label>
+              <input
+                className="mt-1 w-full rounded-xl border border-white/15 bg-black/20 p-2.5 text-sm text-white outline-none focus:border-white/25"
+                value={form.fullName}
+                onChange={(e) => onChange("fullName", e.target.value)}
+              />
+            </div>
 
-          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-slate-300">Tipo documento</label>
               <select
-                className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950/40 p-2 text-slate-100"
+                className="mt-1 w-full rounded-xl border border-white/15 bg-black/20 p-2.5 text-sm text-white outline-none focus:border-white/25"
                 value={form.documentType}
                 onChange={(e) => onChange("documentType", e.target.value)}
-                required
               >
                 <option value="CC">CC</option>
                 <option value="CE">CE</option>
@@ -274,22 +358,18 @@ export default function ClientsPage() {
             <div>
               <label className="text-xs text-slate-300">Número documento</label>
               <input
-                className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950/40 p-2 text-slate-100"
+                className="mt-1 w-full rounded-xl border border-white/15 bg-black/20 p-2.5 text-sm text-white outline-none focus:border-white/25"
                 value={form.documentNumber}
                 onChange={(e) => onChange("documentNumber", e.target.value)}
-                required
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-slate-300">Teléfono</label>
               <input
-                className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950/40 p-2 text-slate-100"
+                className="mt-1 w-full rounded-xl border border-white/15 bg-black/20 p-2.5 text-sm text-white outline-none focus:border-white/25"
                 value={form.phone}
                 onChange={(e) => onChange("phone", e.target.value)}
-                required
               />
             </div>
 
@@ -297,26 +377,25 @@ export default function ClientsPage() {
               <label className="text-xs text-slate-300">Email</label>
               <input
                 type="email"
-                className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950/40 p-2 text-slate-100"
+                className="mt-1 w-full rounded-xl border border-white/15 bg-black/20 p-2.5 text-sm text-white outline-none focus:border-white/25"
                 value={form.email}
                 onChange={(e) => onChange("email", e.target.value)}
-                required
               />
             </div>
           </div>
 
-          <div className="flex gap-2 pt-2">
+          <div className="mt-6 flex flex-wrap gap-2">
             {mode === "create" ? (
               <button
                 onClick={create}
-                className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900"
+                className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:opacity-90"
               >
                 Guardar
               </button>
             ) : (
               <button
                 onClick={update}
-                className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900"
+                className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:opacity-90"
               >
                 Guardar cambios
               </button>
@@ -324,13 +403,13 @@ export default function ClientsPage() {
 
             <button
               onClick={cancelForm}
-              className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200"
+              className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
             >
               Cancelar
             </button>
           </div>
-        </div>
+        </section>
       )}
-    </section>
+    </div>
   );
 }

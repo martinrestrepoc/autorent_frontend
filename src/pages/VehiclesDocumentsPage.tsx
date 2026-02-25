@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getToken } from "../auth/token";
 
@@ -29,6 +29,55 @@ function normalizeMessage(msg: any): string[] {
   return ["Error inesperado"];
 }
 
+function Badge({ text }: { text: string }) {
+  return (
+    <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-slate-200 ring-1 ring-white/15">
+      {text}
+    </span>
+  );
+}
+
+function StatusPill({ status }: { status: DocumentStatus }) {
+  const isOk = status === "VIGENTE";
+  return (
+    <span
+      className={
+        "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 " +
+        (isOk
+          ? "bg-emerald-500/10 text-emerald-200 ring-emerald-500/25"
+          : "bg-red-500/10 text-red-200 ring-red-500/25")
+      }
+    >
+      {status}
+    </span>
+  );
+}
+
+function SkeletonDocRow() {
+  return (
+    <tr className="animate-pulse border-t border-white/10">
+      <td className="px-3 py-3">
+        <div className="h-3 w-16 rounded bg-white/10" />
+      </td>
+      <td className="px-3 py-3">
+        <div className="h-3 w-52 rounded bg-white/10" />
+      </td>
+      <td className="px-3 py-3">
+        <div className="h-6 w-16 rounded-full bg-white/10" />
+      </td>
+      <td className="px-3 py-3">
+        <div className="h-3 w-20 rounded bg-white/10" />
+      </td>
+      <td className="px-3 py-3">
+        <div className="h-3 w-14 rounded bg-white/10" />
+      </td>
+      <td className="px-3 py-3 text-right">
+        <div className="ml-auto h-8 w-28 rounded bg-white/10" />
+      </td>
+    </tr>
+  );
+}
+
 export default function VehiclesDocumentsPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -37,9 +86,12 @@ export default function VehiclesDocumentsPage() {
   const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [documentsError, setDocumentsError] = useState<string | null>(null);
   const [documentSuccessMsg, setDocumentSuccessMsg] = useState<string | null>(null);
+
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const [downloadingDocumentId, setDownloadingDocumentId] = useState<string | null>(null);
+
   const [fileInputKey, setFileInputKey] = useState(0);
+
   const [documentForm, setDocumentForm] = useState<{
     type: VehicleDocumentType;
     expiresAt: string;
@@ -50,9 +102,13 @@ export default function VehiclesDocumentsPage() {
     file: null,
   });
 
+  const inputBase =
+    "mt-1 w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none focus:border-white/25";
+
   useEffect(() => {
     if (!id) return;
     void loadDocuments(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   async function loadDocuments(vehicleId: string) {
@@ -129,11 +185,7 @@ export default function VehiclesDocumentsPage() {
       }
 
       setDocumentSuccessMsg(data?.message ?? "Documento cargado con éxito");
-      setDocumentForm({
-        type: "SOAT",
-        expiresAt: "",
-        file: null,
-      });
+      setDocumentForm({ type: "SOAT", expiresAt: "", file: null });
       setFileInputKey((prev) => prev + 1);
       await loadDocuments(id);
     } catch {
@@ -152,11 +204,14 @@ export default function VehiclesDocumentsPage() {
 
     try {
       const token = getToken();
-      const res = await fetch(`${API_URL}/vehicles/${id}/documentos/${document.id}/descargar`, {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
+      const res = await fetch(
+        `${API_URL}/vehicles/${id}/documentos/${document.id}/descargar`,
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        }
+      );
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -196,176 +251,199 @@ export default function VehiclesDocumentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
-      <header className="mb-8 flex items-center justify-between">
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Documentos del vehículo</h1>
-          <p className="text-sm text-slate-400">Sube, lista y descarga documentos legales.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-white">
+            Documentos del vehículo
+          </h1>
+          <p className="mt-1 text-sm text-slate-400">
+            Sube, lista y descarga documentos legales.
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap gap-2">
           {id && (
             <button
               type="button"
               onClick={() => navigate(`/vehicles/${id}/edit`)}
-              className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-900/60 transition cursor-pointer"
+              className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
             >
               Editar vehículo
             </button>
           )}
+
           <button
             type="button"
-            onClick={() => navigate("/")}
-            className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-white transition cursor-pointer"
+            onClick={() => navigate("/vehicles")}
+            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
           >
-            Volver
+            Volver a vehículos
           </button>
         </div>
-      </header>
+      </div>
 
-      <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
-        {documentsError && (
-          <div className="mb-4 rounded-xl border border-red-900/50 bg-red-950/40 p-3 text-sm text-red-200">
-            {documentsError}
+      {/* Alerts */}
+      {documentsError && (
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+          {documentsError}
+        </div>
+      )}
+
+      {documentSuccessMsg && (
+        <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-sm text-emerald-200">
+          {documentSuccessMsg}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* Upload card */}
+        <section className="lg:col-span-1 rounded-2xl border border-white/10 bg-white/5 p-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-white">Subir documento</h2>
+            <Badge text="Legal" />
           </div>
-        )}
 
-        {documentSuccessMsg && (
-          <div className="mb-4 rounded-xl border border-emerald-900/50 bg-emerald-950/40 p-3 text-sm text-emerald-200">
-            {documentSuccessMsg}
-          </div>
-        )}
+          <form onSubmit={onUploadDocument} className="mt-4 space-y-4">
+            <div>
+              <label className="text-xs text-slate-300">Tipo</label>
+              <select
+                value={documentForm.type}
+                onChange={(e) =>
+                  setDocumentForm((prev) => ({
+                    ...prev,
+                    type: e.target.value as VehicleDocumentType,
+                  }))
+                }
+                className={inputBase}
+              >
+                {DOCUMENT_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <form onSubmit={onUploadDocument} className="space-y-3 rounded-xl border border-slate-800 p-4">
-          <h2 className="text-sm font-semibold text-slate-200">Subir documento</h2>
-          <div>
-            <label className="text-sm text-slate-300">Tipo</label>
-            <select
-              value={documentForm.type}
-              onChange={(e) =>
-                setDocumentForm((prev) => ({
-                  ...prev,
-                  type: e.target.value as VehicleDocumentType,
-                }))
-              }
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 outline-none focus:border-slate-600"
+            <div>
+              <label className="text-xs text-slate-300">Vence el</label>
+              <input
+                type="date"
+                value={documentForm.expiresAt}
+                onChange={(e) =>
+                  setDocumentForm((prev) => ({
+                    ...prev,
+                    expiresAt: e.target.value,
+                  }))
+                }
+                className={inputBase}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-300">
+                Archivo (PDF/JPG/PNG - máx 8MB)
+              </label>
+              <input
+                key={fileInputKey}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                onChange={(e) =>
+                  setDocumentForm((prev) => ({
+                    ...prev,
+                    file: e.target.files?.[0] ?? null,
+                  }))
+                }
+                className="mt-1 w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-sm text-white outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:text-slate-950"
+              />
+            </div>
+
+            <button
+              disabled={uploadingDocument}
+              className="w-full rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:opacity-90 disabled:opacity-60"
             >
-              {DOCUMENT_TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
+              {uploadingDocument ? "Subiendo..." : "Subir documento"}
+            </button>
+          </form>
+        </section>
 
-          <div>
-            <label className="text-sm text-slate-300">Vence el</label>
-            <input
-              type="date"
-              value={documentForm.expiresAt}
-              onChange={(e) =>
-                setDocumentForm((prev) => ({
-                  ...prev,
-                  expiresAt: e.target.value,
-                }))
-              }
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 outline-none focus:border-slate-600"
-            />
-          </div>
+        {/* List card */}
+        <section className="lg:col-span-2 rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+          <div className="flex flex-col gap-3 border-b border-white/10 p-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-semibold text-white">Documentos cargados</h3>
+              <Badge text={`${documents.length}`} />
+            </div>
 
-          <div>
-            <label className="text-sm text-slate-300">Archivo (PDF/JPG/PNG - máx 8MB)</label>
-            <input
-              key={fileInputKey}
-              type="file"
-              accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-              onChange={(e) =>
-                setDocumentForm((prev) => ({
-                  ...prev,
-                  file: e.target.files?.[0] ?? null,
-                }))
-              }
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2 text-sm outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-slate-900"
-            />
-          </div>
-
-          <button
-            disabled={uploadingDocument}
-            className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 hover:bg-white transition disabled:opacity-60 cursor-pointer"
-          >
-            {uploadingDocument ? "Subiendo..." : "Subir documento"}
-          </button>
-        </form>
-
-        <div className="mt-6">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-medium text-slate-200">Documentos cargados</h3>
             <button
               type="button"
-              onClick={() => {
-                if (id) void loadDocuments(id);
-              }}
-              className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-200 hover:bg-slate-900/60 transition cursor-pointer"
+              onClick={() => id && void loadDocuments(id)}
+              className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
             >
               Refrescar
             </button>
           </div>
 
-          {loadingDocuments && <p className="text-sm text-slate-400">Cargando documentos...</p>}
+          <div className="overflow-x-auto">
+            <table className="min-w-[900px] w-full text-sm">
+              <thead className="bg-black/20 text-slate-300">
+                <tr>
+                  <th className="px-3 py-3 text-left font-medium">Tipo</th>
+                  <th className="px-3 py-3 text-left font-medium">Archivo</th>
+                  <th className="px-3 py-3 text-left font-medium">Estado</th>
+                  <th className="px-3 py-3 text-left font-medium">Vence</th>
+                  <th className="px-3 py-3 text-left font-medium">Tamaño</th>
+                  <th className="px-3 py-3 text-right font-medium">Acción</th>
+                </tr>
+              </thead>
 
-          {!loadingDocuments && documents.length === 0 && (
-            <p className="text-sm text-slate-400">No hay documentos cargados para este vehículo.</p>
-          )}
-
-          {!loadingDocuments && documents.length > 0 && (
-            <div className="overflow-x-auto rounded-xl border border-slate-800">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-900/60 text-slate-300">
+              <tbody className="text-slate-200">
+                {loadingDocuments ? (
+                  <>
+                    <SkeletonDocRow />
+                    <SkeletonDocRow />
+                    <SkeletonDocRow />
+                  </>
+                ) : documents.length === 0 ? (
                   <tr>
-                    <th className="px-3 py-2 text-left">Tipo</th>
-                    <th className="px-3 py-2 text-left">Archivo</th>
-                    <th className="px-3 py-2 text-left">Estado</th>
-                    <th className="px-3 py-2 text-left">Vence</th>
-                    <th className="px-3 py-2 text-left">Tamaño</th>
-                    <th className="px-3 py-2 text-right">Acción</th>
+                    <td className="p-6 text-slate-400" colSpan={6}>
+                      No hay documentos cargados para este vehículo.
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {documents.map((doc) => (
-                    <tr key={doc.id} className="border-t border-slate-800">
-                      <td className="px-3 py-2">{doc.type}</td>
-                      <td className="px-3 py-2">{doc.originalName}</td>
-                      <td className="px-3 py-2">
-                        <span
-                          className={`rounded-full px-2 py-1 text-xs ${
-                            doc.status === "VIGENTE"
-                              ? "bg-emerald-950/70 text-emerald-200"
-                              : "bg-red-950/70 text-red-200"
-                          }`}
-                        >
-                          {doc.status}
-                        </span>
+                ) : (
+                  documents.map((doc) => (
+                    <tr
+                      key={doc.id}
+                      className="border-t border-white/10 hover:bg-white/5 transition"
+                    >
+                      <td className="px-3 py-3">{doc.type}</td>
+                      <td className="px-3 py-3">{doc.originalName}</td>
+                      <td className="px-3 py-3">
+                        <StatusPill status={doc.status} />
                       </td>
-                      <td className="px-3 py-2">{formatDate(doc.expiresAt)}</td>
-                      <td className="px-3 py-2">{formatFileSize(doc.size)}</td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-3 py-3">{formatDate(doc.expiresAt)}</td>
+                      <td className="px-3 py-3">{formatFileSize(doc.size)}</td>
+                      <td className="px-3 py-3 text-right">
                         <button
                           type="button"
                           disabled={downloadingDocumentId === doc.id}
                           onClick={() => onDownloadDocument(doc)}
-                          className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-200 hover:bg-slate-900/60 transition disabled:opacity-60 cursor-pointer"
+                          className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-xs font-medium text-white transition hover:bg-white/10 disabled:opacity-60"
                         >
-                          {downloadingDocumentId === doc.id ? "Descargando..." : "Descargar"}
+                          {downloadingDocumentId === doc.id
+                            ? "Descargando..."
+                            : "Descargar"}
                         </button>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

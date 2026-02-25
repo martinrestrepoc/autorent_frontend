@@ -1,11 +1,10 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getToken } from "../auth/token";
 
 type FieldErrors = Partial<Record<"plate" | "brand" | "model" | "year", string>>;
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
-
 // Acepta ABC123 o ABC1234
 const PLATE_REGEX = /^[A-Z]{3}\d{3,4}$/;
 
@@ -15,7 +14,10 @@ function normalizeMessage(msg: any): string[] {
   return ["Error inesperado"];
 }
 
-function mapBackendErrorsToFields(messages: string[]): { fieldErrors: FieldErrors; formError?: string } {
+function mapBackendErrorsToFields(messages: string[]): {
+  fieldErrors: FieldErrors;
+  formError?: string;
+} {
   const fieldErrors: FieldErrors = {};
   let formError: string | undefined;
 
@@ -39,7 +41,6 @@ function mapBackendErrorsToFields(messages: string[]): { fieldErrors: FieldError
       continue;
     }
 
-    // si no se puede mapear a un campo, lo mostramos arriba
     formError = m;
   }
 
@@ -78,7 +79,8 @@ export default function VehiclesCreatePage() {
     const yearStr = form.year.trim();
 
     if (!plate) next.plate = "Campo obligatorio";
-    else if (!PLATE_REGEX.test(plate)) next.plate = "Formato de placa inválido (ej: ABC123)";
+    else if (!PLATE_REGEX.test(plate))
+      next.plate = "Formato de placa inválido (ej: ABC123)";
 
     if (!brand) next.brand = "Campo obligatorio";
     if (!model) next.model = "Campo obligatorio";
@@ -87,7 +89,8 @@ export default function VehiclesCreatePage() {
     else {
       const yearNum = Number(yearStr);
       if (Number.isNaN(yearNum)) next.year = "Año inválido";
-      else if (yearNum < 1950 || yearNum > 2100) next.year = "Año fuera de rango (1950 - 2100)";
+      else if (yearNum < 1950 || yearNum > 2100)
+        next.year = "Año fuera de rango (1950 - 2100)";
     }
 
     setErrors(next);
@@ -127,108 +130,128 @@ export default function VehiclesCreatePage() {
         const messages = normalizeMessage(data?.message);
         const mapped = mapBackendErrorsToFields(messages);
 
-        // merge con lo que ya haya (por si quieres)
         setErrors((prev) => ({ ...prev, ...mapped.fieldErrors }));
         setFormError(mapped.formError ?? null);
         return;
       }
 
       setSuccessMsg(data?.message ?? "Vehículo creado con éxito");
-      // puedes limpiar el form si quieres:
       setForm({ plate: "", brand: "", model: "", year: "" });
       setErrors({});
-    } catch (err: any) {
+    } catch {
       setFormError("No se pudo conectar con el servidor.");
     } finally {
       setLoading(false);
     }
   }
 
+  const inputBase =
+    "mt-1 w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none focus:border-white/25";
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
-      <header className="mb-8 flex items-center justify-between">
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Registrar vehículo</h1>
-          <p className="text-sm text-slate-400">Placa, marca, modelo y año son obligatorios.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-white">
+            Registrar vehículo
+          </h1>
+          <p className="mt-1 text-sm text-slate-400">
+            Placa, marca, modelo y año son obligatorios.
+          </p>
         </div>
 
         <button
           type="button"
-          onClick={() => navigate("/")}
-          className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-white transition cursor-pointer"
+          onClick={() => navigate("/vehicles")}
+          className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
         >
-          Volver
+          Volver a vehículos
         </button>
-      </header>
+      </div>
 
-      <section className="max-w-xl rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
-        {formError && (
-          <div className="mb-4 rounded-xl border border-red-900/50 bg-red-950/40 p-3 text-sm text-red-200">
-            {formError}
-          </div>
-        )}
+      {/* Alerts */}
+      {formError && (
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+          {formError}
+        </div>
+      )}
 
-        {successMsg && (
-          <div className="mb-4 rounded-xl border border-emerald-900/50 bg-emerald-950/40 p-3 text-sm text-emerald-200">
-            {successMsg}
-          </div>
-        )}
+      {successMsg && (
+        <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-sm text-emerald-200">
+          {successMsg}
+        </div>
+      )}
 
-        <form onSubmit={onSubmit} className="space-y-4">
+      {/* Form card */}
+      <section className="max-w-2xl rounded-2xl border border-white/10 bg-white/5 p-6">
+        <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label className="text-sm text-slate-300">Placa</label>
+            <label className="text-xs text-slate-300">Placa</label>
             <input
               name="plate"
               value={form.plate}
               onChange={onChange}
               placeholder="Ej: ABC123"
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 outline-none focus:border-slate-600"
+              className={inputBase}
+              autoCapitalize="characters"
             />
             {errors.plate && <p className="mt-2 text-xs text-red-300">{errors.plate}</p>}
           </div>
 
           <div>
-            <label className="text-sm text-slate-300">Marca</label>
-            <input
-              name="brand"
-              value={form.brand}
-              onChange={onChange}
-              placeholder="Ej: Toyota"
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 outline-none focus:border-slate-600"
-            />
-            {errors.brand && <p className="mt-2 text-xs text-red-300">{errors.brand}</p>}
-          </div>
-
-          <div>
-            <label className="text-sm text-slate-300">Modelo</label>
-            <input
-              name="model"
-              value={form.model}
-              onChange={onChange}
-              placeholder="Ej: Corolla"
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 outline-none focus:border-slate-600"
-            />
-            {errors.model && <p className="mt-2 text-xs text-red-300">{errors.model}</p>}
-          </div>
-
-          <div>
-            <label className="text-sm text-slate-300">Año</label>
+            <label className="text-xs text-slate-300">Año</label>
             <input
               name="year"
               value={form.year}
               onChange={onChange}
               placeholder="Ej: 2021"
-              className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 outline-none focus:border-slate-600"
+              className={inputBase}
+              inputMode="numeric"
             />
             {errors.year && <p className="mt-2 text-xs text-red-300">{errors.year}</p>}
           </div>
 
-          <button
-            disabled={loading}
-            className="w-full rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 hover:bg-white transition disabled:opacity-60 cursor-pointer"
-          >
-            {loading ? "Guardando..." : "Guardar vehículo"}
-          </button>
+          <div>
+            <label className="text-xs text-slate-300">Marca</label>
+            <input
+              name="brand"
+              value={form.brand}
+              onChange={onChange}
+              placeholder="Ej: Toyota"
+              className={inputBase}
+            />
+            {errors.brand && <p className="mt-2 text-xs text-red-300">{errors.brand}</p>}
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-300">Modelo</label>
+            <input
+              name="model"
+              value={form.model}
+              onChange={onChange}
+              placeholder="Ej: Corolla"
+              className={inputBase}
+            />
+            {errors.model && <p className="mt-2 text-xs text-red-300">{errors.model}</p>}
+          </div>
+
+          <div className="md:col-span-2 flex flex-wrap gap-2 pt-2">
+            <button
+              disabled={loading}
+              className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:opacity-90 disabled:opacity-60"
+            >
+              {loading ? "Guardando..." : "Guardar vehículo"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate("/vehicles")}
+              className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
+            >
+              Cancelar
+            </button>
+          </div>
         </form>
       </section>
     </div>
