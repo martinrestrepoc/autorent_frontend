@@ -21,10 +21,6 @@ const emptyForm = {
   email: "",
 };
 
-function cx(...classes: Array<string | false | undefined | null>) {
-  return classes.filter(Boolean).join(" ");
-}
-
 function Badge({ text }: { text: string }) {
   return (
     <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-slate-200 ring-1 ring-white/15">

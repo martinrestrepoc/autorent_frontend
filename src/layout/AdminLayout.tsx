@@ -23,7 +23,7 @@ export default function AdminLayout() {
     );
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="min-h-screen overflow-x-hidden bg-slate-950 text-white">
       {/* Background glow (se ve pro) */}
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute -top-40 left-1/2 h-80 w-[700px] -translate-x-1/2 rounded-full bg-blue-600/20 blur-3xl" />

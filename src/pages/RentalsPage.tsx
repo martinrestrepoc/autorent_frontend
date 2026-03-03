@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getToken } from "../auth/token";
 
@@ -14,6 +14,8 @@ type Rental = {
   };
   fechaInicio: string;
   fechaFin: string;
+  fechaFinReal?: string;
+  diasExceso?: number;
   estado: string;
 };
 
@@ -54,7 +56,10 @@ function SkeletonRow() {
       <td className="p-3"><div className="h-3 w-44 rounded bg-white/10" /></td>
       <td className="p-3"><div className="h-3 w-20 rounded bg-white/10" /></td>
       <td className="p-3"><div className="h-3 w-20 rounded bg-white/10" /></td>
+      <td className="p-3"><div className="h-3 w-20 rounded bg-white/10" /></td>
+      <td className="p-3"><div className="h-3 w-12 rounded bg-white/10" /></td>
       <td className="p-3"><div className="h-6 w-20 rounded-full bg-white/10" /></td>
+      <td className="p-3"><div className="ml-auto h-7 w-20 rounded-lg bg-white/10" /></td>
     </tr>
   );
 }
@@ -66,6 +71,13 @@ export default function RentalsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [finalizeModalOpen, setFinalizeModalOpen] = useState(false);
+  const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
+  const [fechaFinReal, setFechaFinReal] = useState("");
+  const [finalizeError, setFinalizeError] = useState<string | null>(null);
+  const [finalizeLoading, setFinalizeLoading] = useState(false);
+  const [deletingRentalId, setDeletingRentalId] = useState<string | null>(null);
+  const [openActionsRentalId, setOpenActionsRentalId] = useState<string | null>(null);
 
   async function loadRentals() {
     try {
@@ -101,10 +113,122 @@ export default function RentalsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-actions-menu]")) {
+        setOpenActionsRentalId(null);
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, []);
+
   function formatDate(dateString: string) {
     const d = new Date(dateString);
     if (Number.isNaN(d.getTime())) return "—";
     return d.toLocaleDateString("es-CO", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  }
+
+  function normalizeStatus(status: string) {
+    return (status ?? "").toUpperCase();
+  }
+
+  function isInProgress(rental: Rental) {
+    const state = normalizeStatus(rental.estado);
+    return state === "EN_CURSO" || state === "ACTIVO";
+  }
+
+  function openFinalizeModal(rental: Rental) {
+    setSelectedRental(rental);
+    setFechaFinReal("");
+    setFinalizeError(null);
+    setFinalizeModalOpen(true);
+  }
+
+  function closeFinalizeModal() {
+    if (finalizeLoading) return;
+    setFinalizeModalOpen(false);
+    setSelectedRental(null);
+    setFechaFinReal("");
+    setFinalizeError(null);
+  }
+
+  async function submitFinalize() {
+    if (!selectedRental) return;
+
+    setFinalizeError(null);
+
+    if (!fechaFinReal) {
+      setFinalizeError("Selecciona la fecha de fin real");
+      return;
+    }
+
+    if (fechaFinReal < selectedRental.fechaInicio.slice(0, 10)) {
+      setFinalizeError("La fecha de finalización no puede ser anterior a la fecha de inicio");
+      return;
+    }
+
+    try {
+      setFinalizeLoading(true);
+
+      const token = getToken();
+      const res = await fetch(`${API_URL}/alquileres/${selectedRental._id}/finalizar`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ fechaFinReal }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || "No se pudo finalizar el contrato");
+      }
+
+      closeFinalizeModal();
+      await loadRentals();
+    } catch (e) {
+      setFinalizeError((e as Error).message);
+    } finally {
+      setFinalizeLoading(false);
+    }
+  }
+
+  async function removeRental(rental: Rental) {
+    const accepted = window.confirm(
+      `¿Seguro que quieres eliminar el contrato del vehículo ${rental.vehiculo?.plate ?? "—"}?`,
+    );
+    if (!accepted) return;
+
+    try {
+      setError(null);
+      setDeletingRentalId(rental._id);
+
+      const token = getToken();
+      const res = await fetch(`${API_URL}/alquileres/${rental._id}`, {
+        method: "DELETE",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || "No se pudo eliminar el contrato");
+      }
+
+      await loadRentals();
+      setOpenActionsRentalId(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDeletingRentalId(null);
+    }
   }
 
   const filtered = useMemo(() => {
@@ -155,7 +279,7 @@ export default function RentalsPage() {
       )}
 
       {/* Table card */}
-      <section className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+      <section className="relative rounded-2xl border border-white/10 bg-white/5">
         {/* Toolbar */}
         <div className="flex flex-col gap-3 border-b border-white/10 p-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2">
@@ -173,15 +297,18 @@ export default function RentalsPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-[900px] w-full text-sm">
+        <div className="w-full">
+          <table className="w-full table-fixed text-sm">
             <thead className="bg-black/20 text-slate-300">
               <tr>
-                <th className="text-left p-3 font-medium">Vehículo</th>
-                <th className="text-left p-3 font-medium">Cliente</th>
-                <th className="text-left p-3 font-medium">Inicio</th>
-                <th className="text-left p-3 font-medium">Fin</th>
-                <th className="text-left p-3 font-medium">Estado</th>
+                <th className="w-[10%] text-left p-3 font-medium">Vehículo</th>
+                <th className="w-[22%] text-left p-3 font-medium">Cliente</th>
+                <th className="w-[10%] text-left p-3 font-medium">Inicio</th>
+                <th className="w-[10%] text-left p-3 font-medium">Fin</th>
+                <th className="w-[10%] text-left p-3 font-medium">Fin real</th>
+                <th className="w-[10%] text-left p-3 font-medium">Días exceso</th>
+                <th className="w-[12%] text-left p-3 font-medium">Estado</th>
+                <th className="w-[16%] text-right p-3 font-medium">Acciones</th>
               </tr>
             </thead>
 
@@ -194,7 +321,7 @@ export default function RentalsPage() {
                 </>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td className="p-6 text-slate-400" colSpan={5}>
+                  <td className="p-6 text-slate-400" colSpan={8}>
                     {rentals.length === 0
                       ? "No hay alquileres registrados todavía. Crea el primero con “+ Nuevo alquiler”."
                       : "No hay resultados con ese filtro."}
@@ -209,11 +336,65 @@ export default function RentalsPage() {
                     <td className="p-3 font-semibold text-white">
                       {r.vehiculo?.plate ?? "—"}
                     </td>
-                    <td className="p-3">{r.cliente?.email ?? "—"}</td>
+                    <td className="p-3 truncate">{r.cliente?.email ?? "—"}</td>
                     <td className="p-3">{formatDate(r.fechaInicio)}</td>
                     <td className="p-3">{formatDate(r.fechaFin)}</td>
+                    <td className="p-3">{r.fechaFinReal ? formatDate(r.fechaFinReal) : "—"}</td>
+                    <td className="p-3">{typeof r.diasExceso === "number" ? r.diasExceso : 0}</td>
                     <td className="p-3">
                       <StatusPill status={r.estado} />
+                    </td>
+                    <td className="p-3 text-right">
+                      <div className="relative inline-block text-left" data-actions-menu>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOpenActionsRentalId((prev) =>
+                              prev === r._id ? null : r._id,
+                            )
+                          }
+                          className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/10"
+                        >
+                          Acciones
+                        </button>
+
+                        {openActionsRentalId === r._id && (
+                          <div className="absolute bottom-full right-0 z-30 mb-2 w-44 rounded-xl border border-white/10 bg-slate-900/95 p-1 shadow-xl backdrop-blur">
+                            {isInProgress(r) ? (
+                              <button
+                                onClick={() => {
+                                  setOpenActionsRentalId(null);
+                                  openFinalizeModal(r);
+                                }}
+                                className="block w-full rounded-lg px-3 py-2 text-left text-xs text-white hover:bg-white/10"
+                              >
+                                Finalizar contrato
+                              </button>
+                            ) : (
+                              <span className="block rounded-lg px-3 py-2 text-left text-xs text-slate-400">
+                                Sin acciones disponibles
+                              </span>
+                            )}
+
+                            <button
+                              disabled
+                              className="block w-full cursor-not-allowed rounded-lg px-3 py-2 text-left text-xs text-slate-500"
+                            >
+                              Cancelar contrato (próximamente)
+                            </button>
+
+                            <button
+                              onClick={() => removeRental(r)}
+                              disabled={deletingRentalId === r._id}
+                              className="block w-full rounded-lg px-3 py-2 text-left text-xs text-red-300 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {deletingRentalId === r._id
+                                ? "Eliminando..."
+                                : "Eliminar contrato"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -222,6 +403,49 @@ export default function RentalsPage() {
           </table>
         </div>
       </section>
+
+      {finalizeModalOpen && selectedRental && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-white/15 bg-slate-900 p-5">
+            <h2 className="text-lg font-semibold text-white">Finalizar contrato</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Vehículo {selectedRental.vehiculo?.plate ?? "—"} • Inicio {formatDate(selectedRental.fechaInicio)}
+            </p>
+
+            {finalizeError && (
+              <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+                {finalizeError}
+              </div>
+            )}
+
+            <div className="mt-4">
+              <label className="block text-xs text-slate-300">Fecha de fin real</label>
+              <input
+                type="date"
+                value={fechaFinReal}
+                onChange={(e) => setFechaFinReal(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2.5 text-sm text-white outline-none focus:border-white/25"
+              />
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={closeFinalizeModal}
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
+              >
+                Cerrar
+              </button>
+              <button
+                onClick={submitFinalize}
+                disabled={finalizeLoading}
+                className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:opacity-90 disabled:opacity-60"
+              >
+                {finalizeLoading ? "Finalizando..." : "Confirmar finalización"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
