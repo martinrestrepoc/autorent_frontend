@@ -15,6 +15,8 @@ type Rental = {
   fechaInicio: string;
   fechaFin: string;
   fechaFinReal?: string;
+  fechaCancelacion?: string;
+  motivoCancelacion?: string;
   diasExceso?: number;
   estado: string;
 };
@@ -77,7 +79,14 @@ export default function RentalsPage() {
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
   const [finalizeLoading, setFinalizeLoading] = useState(false);
   const [deletingRentalId, setDeletingRentalId] = useState<string | null>(null);
+  const [cancelingRentalId, setCancelingRentalId] = useState<string | null>(null);
   const [openActionsRentalId, setOpenActionsRentalId] = useState<string | null>(null);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelPreviewRental, setCancelPreviewRental] = useState<Rental | null>(null);
+  const [viewCancelInfoOpen, setViewCancelInfoOpen] = useState(false);
+  const [viewCancelInfoRental, setViewCancelInfoRental] = useState<Rental | null>(null);
 
   async function loadRentals() {
     try {
@@ -142,6 +151,19 @@ export default function RentalsPage() {
     return state === "EN_CURSO" || state === "ACTIVO";
   }
 
+  function canDelete(rental: Rental) {
+    return !isInProgress(rental);
+  }
+
+  function canCancel(rental: Rental) {
+    const state = normalizeStatus(rental.estado);
+    return state === "PROGRAMADO" || state === "EN_CURSO" || state === "ACTIVO";
+  }
+
+  function isCancelled(rental: Rental) {
+    return normalizeStatus(rental.estado) === "CANCELADO";
+  }
+
   function openFinalizeModal(rental: Rental) {
     setSelectedRental(rental);
     setFechaFinReal("");
@@ -155,6 +177,31 @@ export default function RentalsPage() {
     setSelectedRental(null);
     setFechaFinReal("");
     setFinalizeError(null);
+  }
+
+  function openCancelModal(rental: Rental) {
+    setCancelPreviewRental(rental);
+    setCancelReason("");
+    setCancelError(null);
+    setCancelModalOpen(true);
+  }
+
+  function closeCancelModal() {
+    if (cancelingRentalId) return;
+    setCancelModalOpen(false);
+    setCancelReason("");
+    setCancelError(null);
+    setCancelPreviewRental(null);
+  }
+
+  function openCancelInfoModal(rental: Rental) {
+    setViewCancelInfoRental(rental);
+    setViewCancelInfoOpen(true);
+  }
+
+  function closeCancelInfoModal() {
+    setViewCancelInfoOpen(false);
+    setViewCancelInfoRental(null);
   }
 
   async function submitFinalize() {
@@ -228,6 +275,44 @@ export default function RentalsPage() {
       setError((e as Error).message);
     } finally {
       setDeletingRentalId(null);
+    }
+  }
+
+  async function cancelRental() {
+    if (!cancelPreviewRental || !canCancel(cancelPreviewRental)) return;
+    setCancelError(null);
+
+    if (!cancelReason.trim()) {
+      setCancelError("Ingrese motivo de cancelación");
+      return;
+    }
+
+    try {
+      setError(null);
+      setCancelingRentalId(cancelPreviewRental._id);
+
+      const token = getToken();
+      const res = await fetch(`${API_URL}/alquileres/${cancelPreviewRental._id}/cancelar`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ motivoCancelacion: cancelReason.trim() }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || "No se pudo cancelar el contrato");
+      }
+
+      await loadRentals();
+      setOpenActionsRentalId(null);
+      closeCancelModal();
+    } catch (e) {
+      setCancelError((e as Error).message);
+    } finally {
+      setCancelingRentalId(null);
     }
   }
 
@@ -360,38 +445,51 @@ export default function RentalsPage() {
 
                         {openActionsRentalId === r._id && (
                           <div className="absolute bottom-full right-0 z-30 mb-2 w-44 rounded-xl border border-white/10 bg-slate-900/95 p-1 shadow-xl backdrop-blur">
-                            {isInProgress(r) ? (
-                              <button
-                                onClick={() => {
-                                  setOpenActionsRentalId(null);
-                                  openFinalizeModal(r);
-                                }}
-                                className="block w-full rounded-lg px-3 py-2 text-left text-xs text-white hover:bg-white/10"
-                              >
-                                Finalizar contrato
-                              </button>
-                            ) : (
-                              <span className="block rounded-lg px-3 py-2 text-left text-xs text-slate-400">
-                                Sin acciones disponibles
-                              </span>
-                            )}
+                            <button
+                              onClick={() => {
+                                setOpenActionsRentalId(null);
+                                openFinalizeModal(r);
+                              }}
+                              disabled={!isInProgress(r)}
+                              className="block w-full rounded-lg px-3 py-2 text-left text-xs text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
+                            >
+                              Finalizar contrato
+                            </button>
 
                             <button
-                              disabled
-                              className="block w-full cursor-not-allowed rounded-lg px-3 py-2 text-left text-xs text-slate-500"
+                              onClick={() => {
+                                setOpenActionsRentalId(null);
+                                openCancelModal(r);
+                              }}
+                              disabled={!canCancel(r) || cancelingRentalId === r._id}
+                              className="block w-full rounded-lg px-3 py-2 text-left text-xs text-slate-300 hover:bg-white/10 disabled:cursor-not-allowed disabled:text-slate-500"
                             >
-                              Cancelar contrato (próximamente)
+                              {cancelingRentalId === r._id
+                                ? "Cancelando..."
+                                : "Cancelar contrato"}
                             </button>
 
                             <button
                               onClick={() => removeRental(r)}
-                              disabled={deletingRentalId === r._id}
+                              disabled={!canDelete(r) || deletingRentalId === r._id}
                               className="block w-full rounded-lg px-3 py-2 text-left text-xs text-red-300 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {deletingRentalId === r._id
                                 ? "Eliminando..."
                                 : "Eliminar contrato"}
                             </button>
+
+                            {isCancelled(r) && (
+                              <button
+                                onClick={() => {
+                                  setOpenActionsRentalId(null);
+                                  openCancelInfoModal(r);
+                                }}
+                                className="block w-full rounded-lg px-3 py-2 text-left text-xs text-slate-300 hover:bg-white/10"
+                              >
+                                Ver motivo cancelación
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -441,6 +539,88 @@ export default function RentalsPage() {
                 className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:opacity-90 disabled:opacity-60"
               >
                 {finalizeLoading ? "Finalizando..." : "Confirmar finalización"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cancelModalOpen && cancelPreviewRental && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-white/15 bg-slate-900 p-5">
+            <h2 className="text-lg font-semibold text-white">Cancelar contrato</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Vehículo {cancelPreviewRental.vehiculo?.plate ?? "—"} • Inicio {formatDate(cancelPreviewRental.fechaInicio)}
+            </p>
+
+            {cancelError && (
+              <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+                {cancelError}
+              </div>
+            )}
+
+            <div className="mt-4">
+              <label className="block text-xs text-slate-300">Motivo de cancelación</label>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                rows={4}
+                placeholder="Describe el motivo..."
+                className="mt-1 w-full resize-none rounded-xl border border-white/15 bg-black/20 px-3 py-2.5 text-sm text-white outline-none focus:border-white/25"
+              />
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={closeCancelModal}
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
+              >
+                Cerrar
+              </button>
+              <button
+                onClick={cancelRental}
+                disabled={cancelingRentalId === cancelPreviewRental._id}
+                className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:opacity-90 disabled:opacity-60"
+              >
+                {cancelingRentalId === cancelPreviewRental._id
+                  ? "Cancelando..."
+                  : "Confirmar cancelación"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewCancelInfoOpen && viewCancelInfoRental && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-white/15 bg-slate-900 p-5">
+            <h2 className="text-lg font-semibold text-white">Motivo de cancelación</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Vehículo {viewCancelInfoRental.vehiculo?.plate ?? "—"}
+            </p>
+
+            <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
+              <p className="text-xs text-slate-400">Fecha de cancelación</p>
+              <p className="mt-1 text-sm text-slate-200">
+                {viewCancelInfoRental.fechaCancelacion
+                  ? formatDate(viewCancelInfoRental.fechaCancelacion)
+                  : "—"}
+              </p>
+            </div>
+
+            <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3">
+              <p className="text-xs text-slate-400">Motivo</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-slate-200">
+                {viewCancelInfoRental.motivoCancelacion?.trim() || "No registrado"}
+              </p>
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                onClick={closeCancelInfoModal}
+                className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:opacity-90"
+              >
+                Cerrar
               </button>
             </div>
           </div>

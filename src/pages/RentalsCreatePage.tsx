@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getToken } from "../auth/token";
 
@@ -25,6 +25,7 @@ function normalizeMessage(msg: any): string[] {
 
 export default function RentalsCreatePage() {
   const navigate = useNavigate();
+  const todayString = new Date().toISOString().slice(0, 10);
 
   const [clients, setClients] = useState<Client[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -90,14 +91,6 @@ export default function RentalsCreatePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const availableVehicles = useMemo(() => {
-    // Si tu backend usa AVAILABLE, perfecto. Si no, igual mostramos todos.
-    const hasStatus = vehicles.some((v) => typeof v.status === "string");
-    if (!hasStatus) return vehicles;
-
-    return vehicles.filter((v) => (v.status ?? "").toUpperCase() === "AVAILABLE");
-  }, [vehicles]);
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -110,6 +103,11 @@ export default function RentalsCreatePage() {
 
     if (fechaFin <= fechaInicio) {
       setError("La fecha fin debe ser mayor a la fecha inicio");
+      return;
+    }
+
+    if (fechaInicio < todayString) {
+      setError("La fecha inicio no puede ser anterior a hoy");
       return;
     }
 
@@ -152,7 +150,7 @@ export default function RentalsCreatePage() {
             Crear nuevo alquiler
           </h1>
           <p className="mt-1 text-sm text-slate-400">
-            Selecciona cliente, vehículo disponible y rango de fechas.
+            Selecciona cliente, vehículo y rango de fechas para programar el contrato.
           </p>
         </div>
 
@@ -217,19 +215,13 @@ export default function RentalsCreatePage() {
               >
                 <option value="">Seleccionar vehículo</option>
 
-                {(availableVehicles.length > 0 ? availableVehicles : vehicles).map((v) => (
+                {vehicles.map((v) => (
                   <option key={v._id} value={v._id}>
                     {v.plate} - {v.brand}
                     {v.status ? ` (${v.status})` : ""}
                   </option>
                 ))}
               </select>
-
-              {vehicles.length > 0 && availableVehicles.length === 0 && (
-                <p className="mt-2 text-xs text-amber-200/90">
-                  Nota: No se detectaron vehículos con estado AVAILABLE, por eso se muestran todos.
-                </p>
-              )}
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -239,6 +231,7 @@ export default function RentalsCreatePage() {
                   type="date"
                   value={fechaInicio}
                   onChange={(e) => setFechaInicio(e.target.value)}
+                  min={todayString}
                   className={inputBase}
                 />
               </div>
@@ -249,6 +242,7 @@ export default function RentalsCreatePage() {
                   type="date"
                   value={fechaFin}
                   onChange={(e) => setFechaFin(e.target.value)}
+                  min={fechaInicio || todayString}
                   className={inputBase}
                 />
               </div>
