@@ -199,6 +199,12 @@ export default function VehiclesPage() {
                         >
                           Editar
                         </button>
+                        <button
+                          onClick={() => navigate(`/vehicles/${v._id}/rentals`)}
+                          className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/10"
+                        >
+                          Historial
+                        </button>
                       </div>
                     </td>
                   </tr>

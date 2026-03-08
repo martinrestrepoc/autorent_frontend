@@ -16,6 +16,7 @@ import { RequireAuth } from "./auth/RequireAuth";
 import AdminLayout from "./layout/AdminLayout";
 
 import RentalsPage from "./pages/RentalsPage";
+import RentalsHistoryPage from "./pages/RentalsHistoryPage";
 
 
 export default function App() {
@@ -47,6 +48,7 @@ export default function App() {
         {/* Rentals */}
         <Route path="/rentals" element={<RentalsPage />} />
         <Route path="/rentals/new" element={<RentalsCreatePage />} />
+        <Route path="/vehicles/:id/rentals" element={<RentalsHistoryPage />} />
       </Route>
 
       {/* Fallback */}
