@@ -11,13 +11,16 @@ import ClientsCreatePage from "./pages/ClientsCreatePage";
 import VehiclesPage from "./pages/VehiclesPage";
 
 import RentalsCreatePage from "./pages/RentalsCreatePage";
-
-import { RequireAuth } from "./auth/RequireAuth";
-import AdminLayout from "./layout/AdminLayout";
-
 import RentalsPage from "./pages/RentalsPage";
 import RentalsHistoryPage from "./pages/RentalsHistoryPage";
 
+// ↓ NUEVAS páginas de mantenimientos
+import MaintenanceCreatePage from "./pages/MaintenanceCreatePage";
+import MaintenanceHistoryPage from "./pages/MaintenanceHistoryPage";
+import MaintenanceDetailPage from "./pages/MaintenanceDetailPage";
+
+import { RequireAuth } from "./auth/RequireAuth";
+import AdminLayout from "./layout/AdminLayout";
 
 export default function App() {
   return (
@@ -49,6 +52,11 @@ export default function App() {
         <Route path="/rentals" element={<RentalsPage />} />
         <Route path="/rentals/new" element={<RentalsCreatePage />} />
         <Route path="/vehicles/:id/rentals" element={<RentalsHistoryPage />} />
+
+        {/* ↓ Mantenimientos */}
+        <Route path="/vehicles/:id/maintenances" element={<MaintenanceHistoryPage />} />
+        <Route path="/vehicles/:id/maintenances/new" element={<MaintenanceCreatePage />} />
+        <Route path="/maintenances/:id" element={<MaintenanceDetailPage />} />
       </Route>
 
       {/* Fallback */}
