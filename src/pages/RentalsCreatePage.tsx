@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getToken } from "../auth/token";
+import { useTopbarAction } from "../layout/useTopbarAction";
 
 type Client = {
   _id: string;
@@ -25,6 +26,7 @@ function normalizeMessage(msg: any): string[] {
 
 export default function RentalsCreatePage() {
   const navigate = useNavigate();
+  useTopbarAction({ label: "Volver", to: "/rentals" });
   const todayString = new Date().toISOString().slice(0, 10);
 
   const [clients, setClients] = useState<Client[]>([]);
@@ -34,6 +36,14 @@ export default function RentalsCreatePage() {
   const [vehiculo, setVehiculo] = useState("");
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
+  const [createStartReminder, setCreateStartReminder] = useState(false);
+  const [startReminderDate, setStartReminderDate] = useState("");
+  const [startReminderTitle, setStartReminderTitle] = useState("");
+  const [startReminderDetail, setStartReminderDetail] = useState("");
+  const [createReturnReminder, setCreateReturnReminder] = useState(false);
+  const [returnReminderDate, setReturnReminderDate] = useState("");
+  const [returnReminderTitle, setReturnReminderTitle] = useState("");
+  const [returnReminderDetail, setReturnReminderDetail] = useState("");
 
   const [loadingInit, setLoadingInit] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -91,6 +101,20 @@ export default function RentalsCreatePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (createStartReminder) {
+      if (!startReminderDate) setStartReminderDate(fechaInicio);
+      if (!startReminderTitle) setStartReminderTitle("Inicio de alquiler");
+    }
+  }, [createStartReminder, fechaInicio, startReminderDate, startReminderTitle]);
+
+  useEffect(() => {
+    if (createReturnReminder) {
+      if (!returnReminderDate) setReturnReminderDate(fechaFin);
+      if (!returnReminderTitle) setReturnReminderTitle("Devolución de alquiler");
+    }
+  }, [createReturnReminder, fechaFin, returnReminderDate, returnReminderTitle]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -114,6 +138,10 @@ export default function RentalsCreatePage() {
     try {
       setLoading(true);
 
+      const selectedClient = clients.find((item) => item._id === cliente);
+      const clientLabel =
+        selectedClient?.fullName || selectedClient?.email || "cliente asignado";
+
       const token = getToken();
       const res = await fetch(`${API_URL}/alquileres`, {
         method: "POST",
@@ -121,7 +149,22 @@ export default function RentalsCreatePage() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ cliente, vehiculo, fechaInicio, fechaFin }),
+        body: JSON.stringify({
+          cliente,
+          vehiculo,
+          fechaInicio,
+          fechaFin,
+          createStartReminder,
+          startReminderDate: startReminderDate || fechaInicio,
+          startReminderTitle: startReminderTitle || "Inicio de alquiler",
+          startReminderDetail:
+            startReminderDetail || `Entrega programada para ${clientLabel}`,
+          createReturnReminder,
+          returnReminderDate: returnReminderDate || fechaFin,
+          returnReminderTitle: returnReminderTitle || "Devolución de alquiler",
+          returnReminderDetail:
+            returnReminderDetail || `Recepción programada de ${clientLabel}`,
+        }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -154,13 +197,6 @@ export default function RentalsCreatePage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => navigate("/rentals")}
-          className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
-        >
-          Volver a alquileres
-        </button>
       </div>
 
       {/* Alerts */}
@@ -246,6 +282,119 @@ export default function RentalsCreatePage() {
                   className={inputBase}
                 />
               </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/10 p-4 space-y-4">
+              <div className="space-y-1">
+                <h2 className="text-sm font-semibold text-white">
+                  Recordatorios opcionales
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Puedes dejar programado el aviso de inicio y/o devolución desde este mismo formulario.
+                </p>
+              </div>
+
+              <label className="flex items-center gap-3 text-sm text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={createStartReminder}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setCreateStartReminder(checked);
+                    if (checked) {
+                      setStartReminderDate((current) => current || fechaInicio);
+                      setStartReminderTitle((current) => current || "Inicio de alquiler");
+                    }
+                  }}
+                  className="h-4 w-4 rounded border-white/20 bg-black/20"
+                />
+                Agregar recordatorio de inicio
+              </label>
+
+              {createStartReminder && (
+                <div className="grid grid-cols-1 gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 md:grid-cols-3">
+                  <div>
+                    <label className="block text-xs text-slate-300">Fecha</label>
+                    <input
+                      type="date"
+                      value={startReminderDate}
+                      onChange={(e) => setStartReminderDate(e.target.value)}
+                      min={todayString}
+                      className={inputBase}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs text-slate-300">Título</label>
+                    <input
+                      type="text"
+                      value={startReminderTitle}
+                      onChange={(e) => setStartReminderTitle(e.target.value)}
+                      className={inputBase}
+                    />
+                  </div>
+                  <div className="md:col-span-3">
+                    <label className="block text-xs text-slate-300">Detalle</label>
+                    <textarea
+                      value={startReminderDetail}
+                      onChange={(e) => setStartReminderDetail(e.target.value)}
+                      rows={2}
+                      className={`${inputBase} resize-none`}
+                      placeholder="Detalle para el recordatorio de inicio"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <label className="flex items-center gap-3 text-sm text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={createReturnReminder}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setCreateReturnReminder(checked);
+                    if (checked) {
+                      setReturnReminderDate((current) => current || fechaFin);
+                      setReturnReminderTitle((current) => current || "Devolución de alquiler");
+                    }
+                  }}
+                  className="h-4 w-4 rounded border-white/20 bg-black/20"
+                />
+                Agregar recordatorio de devolución
+              </label>
+
+              {createReturnReminder && (
+                <div className="grid grid-cols-1 gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 md:grid-cols-3">
+                  <div>
+                    <label className="block text-xs text-slate-300">Fecha</label>
+                    <input
+                      type="date"
+                      value={returnReminderDate}
+                      onChange={(e) => setReturnReminderDate(e.target.value)}
+                      min={fechaInicio || todayString}
+                      className={inputBase}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs text-slate-300">Título</label>
+                    <input
+                      type="text"
+                      value={returnReminderTitle}
+                      onChange={(e) => setReturnReminderTitle(e.target.value)}
+                      className={inputBase}
+                    />
+                  </div>
+                  <div className="md:col-span-3">
+                    <label className="block text-xs text-slate-300">Detalle</label>
+                    <textarea
+                      value={returnReminderDetail}
+                      onChange={(e) => setReturnReminderDetail(e.target.value)}
+                      rows={2}
+                      className={`${inputBase} resize-none`}
+                      placeholder="Detalle para el recordatorio de devolución"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-2 pt-2">

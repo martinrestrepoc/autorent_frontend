@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { http } from "../api/http";
+import { useTopbarAction } from "../layout/useTopbarAction";
 
 export default function ClientsCreatePage() {
   const navigate = useNavigate();
+  useTopbarAction({ label: "Volver", to: "/clients" });
 
   const [form, setForm] = useState({
     fullName: "",
@@ -48,13 +50,6 @@ export default function ClientsCreatePage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => navigate("/clients")}
-          className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
-        >
-          Volver
-        </button>
       </div>
 
       {/* Error */}

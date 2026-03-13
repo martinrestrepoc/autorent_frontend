@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTopbarAction } from "../layout/useTopbarAction";
 import { getToken } from "../auth/token";
 
 type VehicleDocumentType = "SOAT" | "TARJETA_PROPIEDAD" | "TECNOMECANICA";
@@ -81,6 +82,7 @@ function SkeletonDocRow() {
 export default function VehiclesDocumentsPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  useTopbarAction({ label: "Volver", to: "/vehicles" });
 
   const [documents, setDocuments] = useState<VehicleLegalDocument[]>([]);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
@@ -273,14 +275,6 @@ export default function VehiclesDocumentsPage() {
               Editar vehículo
             </button>
           )}
-
-          <button
-            type="button"
-            onClick={() => navigate("/vehicles")}
-            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
-          >
-            Volver a vehículos
-          </button>
         </div>
       </div>
 

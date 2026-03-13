@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { http } from "../api/http";
+import VehicleStatusBadge from "../components/VehicleStatusBadge";
 
 type Vehicle = {
   _id: string;
@@ -50,8 +51,8 @@ export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
-
   const [query, setQuery] = useState("");
+  const [openActionsVehicleId, setOpenActionsVehicleId] = useState<string | null>(null);
 
   const loadVehicles = async () => {
     try {
@@ -71,6 +72,20 @@ export default function VehiclesPage() {
 
   useEffect(() => {
     loadVehicles();
+  }, []);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-actions-menu]")) {
+        setOpenActionsVehicleId(null);
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
   }, []);
 
   const filtered = useMemo(() => {
@@ -123,7 +138,7 @@ export default function VehiclesPage() {
       )}
 
       {/* List */}
-      <section className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+      <section className="rounded-2xl border border-white/10 bg-white/5">
         {/* Toolbar */}
         <div className="flex flex-col gap-3 border-b border-white/10 p-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2">
@@ -142,7 +157,7 @@ export default function VehiclesPage() {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-visible">
           <table className="min-w-[900px] w-full text-sm">
             <thead className="bg-black/20 text-slate-300">
               <tr>
@@ -174,43 +189,77 @@ export default function VehiclesPage() {
                 filtered.map((v) => (
                   <tr
                     key={v._id}
-                    className="border-t border-white/10 hover:bg-white/5 transition"
+                    className="border-t border-white/10 transition hover:bg-white/5"
                   >
                     <td className="p-3 font-semibold text-white">{v.plate}</td>
                     <td className="p-3">{v.brand}</td>
                     <td className="p-3">{v.model}</td>
                     <td className="p-3">{v.year}</td>
                     <td className="p-3">
-                      <span className="rounded-lg bg-white/10 px-2 py-1 text-xs ring-1 ring-white/15">
-                        {v.status ?? "—"}
-                      </span>
+                      <VehicleStatusBadge status={v.status} />
                     </td>
                     <td className="p-3 text-right">
-                      <div className="inline-flex gap-2">
+                      <div className="relative inline-flex" data-actions-menu>
                         <button
-                          onClick={() => navigate(`/vehicles/${v._id}/documents`)}
+                          onClick={() =>
+                            setOpenActionsVehicleId((current) =>
+                              current === v._id ? null : v._id,
+                            )
+                          }
                           className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/10"
                         >
-                          Docs
+                          Acciones
                         </button>
-                        <button
-                          onClick={() => navigate(`/vehicles/${v._id}/maintenances`)}
-                          className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/10"
-                        >
-                          Mantenimientos
-                        </button>
-                        <button
-                          onClick={() => navigate(`/vehicles/${v._id}/edit`)}
-                          className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/10"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => navigate(`/vehicles/${v._id}/rentals`)}
-                          className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/10"
-                        >
-                          Historial
-                        </button>
+
+                        {openActionsVehicleId === v._id && (
+                          <div className="absolute right-0 top-full z-20 mt-2 min-w-52 overflow-hidden rounded-xl border border-white/10 bg-slate-950/95 text-left shadow-2xl backdrop-blur">
+                            <button
+                              onClick={() => {
+                                setOpenActionsVehicleId(null);
+                                navigate(`/vehicles/${v._id}/documents`);
+                              }}
+                              className="block w-full px-4 py-3 text-xs font-medium text-white transition hover:bg-white/5"
+                            >
+                              Documentos
+                            </button>
+                            <button
+                              onClick={() => {
+                                setOpenActionsVehicleId(null);
+                                navigate(`/vehicles/${v._id}/maintenances`);
+                              }}
+                              className="block w-full border-t border-white/10 px-4 py-3 text-xs font-medium text-white transition hover:bg-white/5"
+                            >
+                              Mantenimientos
+                            </button>
+                            <button
+                              onClick={() => {
+                                setOpenActionsVehicleId(null);
+                                navigate(`/vehicles/${v._id}/reminders`);
+                              }}
+                              className="block w-full border-t border-white/10 px-4 py-3 text-xs font-medium text-white transition hover:bg-white/5"
+                            >
+                              Recordatorios
+                            </button>
+                            <button
+                              onClick={() => {
+                                setOpenActionsVehicleId(null);
+                                navigate(`/vehicles/${v._id}/edit`);
+                              }}
+                              className="block w-full border-t border-white/10 px-4 py-3 text-xs font-medium text-white transition hover:bg-white/5"
+                            >
+                              Editar vehículo
+                            </button>
+                            <button
+                              onClick={() => {
+                                setOpenActionsVehicleId(null);
+                                navigate(`/vehicles/${v._id}/rentals`);
+                              }}
+                              className="block w-full border-t border-white/10 px-4 py-3 text-xs font-medium text-white transition hover:bg-white/5"
+                            >
+                              Historial de alquileres
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>

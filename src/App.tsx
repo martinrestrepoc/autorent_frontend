@@ -18,6 +18,10 @@ import RentalsHistoryPage from "./pages/RentalsHistoryPage";
 import MaintenanceCreatePage from "./pages/MaintenanceCreatePage";
 import MaintenanceHistoryPage from "./pages/MaintenanceHistoryPage";
 import MaintenanceDetailPage from "./pages/MaintenanceDetailPage";
+import NotificationsPage from "./pages/NotificationsPage";
+import RemindersPage from "./pages/RemindersPage";
+import ReminderCreatePage from "./pages/ReminderCreatePage";
+import AgendaPage from "./pages/AgendaPage";
 
 import { RequireAuth } from "./auth/RequireAuth";
 import AdminLayout from "./layout/AdminLayout";
@@ -52,11 +56,15 @@ export default function App() {
         <Route path="/rentals" element={<RentalsPage />} />
         <Route path="/rentals/new" element={<RentalsCreatePage />} />
         <Route path="/vehicles/:id/rentals" element={<RentalsHistoryPage />} />
+        <Route path="/agenda" element={<AgendaPage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
 
         {/* ↓ Mantenimientos */}
         <Route path="/vehicles/:id/maintenances" element={<MaintenanceHistoryPage />} />
         <Route path="/vehicles/:id/maintenances/new" element={<MaintenanceCreatePage />} />
         <Route path="/maintenances/:id" element={<MaintenanceDetailPage />} />
+        <Route path="/vehicles/:id/reminders" element={<RemindersPage />} />
+        <Route path="/vehicles/:id/reminders/new" element={<ReminderCreatePage />} />
       </Route>
 
       {/* Fallback */}

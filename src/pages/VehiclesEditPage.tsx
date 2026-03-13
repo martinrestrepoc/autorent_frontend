@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTopbarAction } from "../layout/useTopbarAction";
 import { getToken } from "../auth/token";
 
 type FieldErrors = Partial<Record<"plate" | "brand" | "model" | "year", string>>;
@@ -74,6 +75,7 @@ function SkeletonForm() {
 export default function VehiclesEditPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  useTopbarAction({ label: "Volver", to: "/vehicles" });
 
   const [form, setForm] = useState({
     plate: "",
@@ -244,14 +246,6 @@ export default function VehiclesEditPage() {
               Documentos
             </button>
           )}
-
-          <button
-            type="button"
-            onClick={() => navigate("/vehicles")}
-            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
-          >
-            Volver a vehículos
-          </button>
         </div>
       </div>
 

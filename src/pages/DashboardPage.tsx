@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getToken } from "../auth/token";
+import VehicleStatusBadge from "../components/VehicleStatusBadge";
 
 type Vehicle = {
   _id: string;
@@ -270,9 +271,7 @@ export default function DashboardPage() {
                       </p>
                       <p className="mt-1 text-xs text-slate-400">
                         Estado:{" "}
-                        <span className="text-slate-300">
-                          {v.status ?? "—"}
-                        </span>
+                        <VehicleStatusBadge status={v.status} />
                       </p>
                     </div>
 
@@ -332,7 +331,9 @@ export default function DashboardPage() {
                   className="flex items-center justify-between rounded-xl border border-white/10 bg-black/20 p-4"
                 >
                   <div>
-                    <p className="text-sm font-medium text-white">{status}</p>
+                    <div className="flex items-center gap-2">
+                      <VehicleStatusBadge status={status} />
+                    </div>
                     <p className="mt-1 text-xs text-slate-400">
                       Vehículos en este estado
                     </p>

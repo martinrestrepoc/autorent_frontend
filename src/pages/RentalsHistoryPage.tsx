@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { http } from "../api/http";
+import { useTopbarAction } from "../layout/useTopbarAction";
 
 type Client = {
   _id: string;
@@ -31,9 +32,8 @@ function SkeletonRow() {
 }
 
 export default function RentalsHistoryPage() {
-
   const { id } = useParams();
-  const navigate = useNavigate();
+  useTopbarAction({ label: "Volver", to: "/vehicles" });
 
   const [rents, setRents] = useState<Rent[]>([]);
   const [loading, setLoading] = useState(false);
@@ -82,13 +82,6 @@ export default function RentalsHistoryPage() {
         </div>
 
         <div className="flex gap-2">
-          <button
-            onClick={() => navigate("/vehicles")}
-            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
-          >
-            Volver
-          </button>
-
           <button
             onClick={loadHistory}
             className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"

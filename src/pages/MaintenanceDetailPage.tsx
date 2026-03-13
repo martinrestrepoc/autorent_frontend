@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { http } from "../api/http";
+import { useTopbarAction } from "../layout/useTopbarAction";
 
 type Maintenance = {
   _id: string;
   vehiculo_id: string;
   tipo: "preventivo" | "correctivo";
   descripcion: string;
-  fecha: string;
+  fechaInicio: string;
+  fechaEntrega: string;
   costo: number;
   createdAt: string;
 };
@@ -33,11 +35,15 @@ function TipoBadge({ tipo }: { tipo: string }) {
 
 export default function MaintenanceDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-
   const [maintenance, setMaintenance] = useState<Maintenance | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  useTopbarAction({
+    label: "Volver",
+    to: maintenance?.vehiculo_id
+      ? `/vehicles/${maintenance.vehiculo_id}/maintenances`
+      : "/vehicles",
+  });
 
   async function load() {
     try {
@@ -87,24 +93,6 @@ export default function MaintenanceDetailPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {maintenance?.vehiculo_id && (
-            <button
-              onClick={() =>
-                navigate(`/vehicles/${maintenance.vehiculo_id}/maintenances`)
-              }
-              className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
-            >
-              Historial del vehículo
-            </button>
-          )}
-          <button
-            onClick={() => navigate(-1)}
-            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
-          >
-            Volver
-          </button>
-        </div>
       </div>
 
       {/* Error */}
@@ -142,16 +130,29 @@ export default function MaintenanceDetailPage() {
           )}
         </div>
 
-        {/* Fecha */}
+        {/* Fecha inicio */}
         <div>
           <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">
-            Fecha
+            Fecha de inicio
           </p>
           {loading ? (
             <SkeletonField />
           ) : (
             <p className="text-sm text-white">
-              {formatDate(maintenance?.fecha)}
+              {formatDate(maintenance?.fechaInicio)}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">
+            Fecha de entrega
+          </p>
+          {loading ? (
+            <SkeletonField />
+          ) : (
+            <p className="text-sm text-white">
+              {formatDate(maintenance?.fechaEntrega)}
             </p>
           )}
         </div>

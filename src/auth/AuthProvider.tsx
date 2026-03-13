@@ -9,22 +9,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     (async () => {
       try {
         const token = getToken();
         if (!token) {
-          setUser(null);
+          if (mounted) {
+            setUser(null);
+            setLoading(false);
+          }
           return;
         }
-        const { data } = await http.get<User>("/auth/me");
-        setUser(data);
+
+        const { data } = await http.get<User>("/auth/me", {
+          timeout: 8000,
+        });
+
+        if (mounted) {
+          setUser(data);
+        }
       } catch {
         clearToken();
-        setUser(null);
+        if (mounted) {
+          setUser(null);
+        }
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     })();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   async function login(email: string, password: string) {

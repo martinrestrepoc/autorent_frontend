@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { http } from "../api/http";
+import { useTopbarAction } from "../layout/useTopbarAction";
 
 type Maintenance = {
   _id: string;
   tipo: "preventivo" | "correctivo";
   descripcion: string;
-  fecha: string;
+  fechaInicio: string;
+  fechaEntrega: string;
   costo: number;
   createdAt: string;
 };
@@ -19,6 +21,9 @@ function SkeletonRow() {
       </td>
       <td className="p-3">
         <div className="h-3 w-40 rounded bg-white/10" />
+      </td>
+      <td className="p-3">
+        <div className="h-3 w-24 rounded bg-white/10" />
       </td>
       <td className="p-3">
         <div className="h-3 w-24 rounded bg-white/10" />
@@ -48,6 +53,7 @@ function TipoBadge({ tipo }: { tipo: string }) {
 export default function MaintenanceHistoryPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  useTopbarAction({ label: "Volver", to: "/vehicles" });
 
   const [mantenimientos, setMantenimientos] = useState<Maintenance[]>([]);
   const [loading, setLoading] = useState(false);
@@ -116,12 +122,6 @@ export default function MaintenanceHistoryPage() {
           >
             Refrescar
           </button>
-          <button
-            onClick={() => navigate("/vehicles")}
-            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
-          >
-            Volver
-          </button>
         </div>
       </div>
 
@@ -140,7 +140,8 @@ export default function MaintenanceHistoryPage() {
               <tr>
                 <th className="p-3 text-left font-medium">Tipo</th>
                 <th className="p-3 text-left font-medium">Descripción</th>
-                <th className="p-3 text-left font-medium">Fecha</th>
+                <th className="p-3 text-left font-medium">Inicio</th>
+                <th className="p-3 text-left font-medium">Entrega</th>
                 <th className="p-3 text-left font-medium">Costo</th>
                 <th className="p-3 text-right font-medium">Detalle</th>
               </tr>
@@ -155,7 +156,7 @@ export default function MaintenanceHistoryPage() {
                 </>
               ) : mantenimientos.length === 0 ? (
                 <tr>
-                  <td className="p-6 text-slate-400" colSpan={5}>
+                  <td className="p-6 text-slate-400" colSpan={6}>
                     Sin historial de mantenimientos. Registra el primero.
                   </td>
                 </tr>
@@ -171,7 +172,8 @@ export default function MaintenanceHistoryPage() {
                     <td className="p-3 max-w-xs truncate" title={m.descripcion}>
                       {m.descripcion}
                     </td>
-                    <td className="p-3">{formatDate(m.fecha)}</td>
+                    <td className="p-3">{formatDate(m.fechaInicio)}</td>
+                    <td className="p-3">{formatDate(m.fechaEntrega)}</td>
                     <td className="p-3">{formatCurrency(m.costo)}</td>
                     <td className="p-3 text-right">
                       <button

@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { http } from "../api/http";
+import { useTopbarAction } from "../layout/useTopbarAction";
 
 type MaintenanceType = "preventivo" | "correctivo";
 
 type FormState = {
   tipo: MaintenanceType;
   descripcion: string;
-  fecha: string;
+  fechaInicio: string;
+  fechaEntrega: string;
   costo: string;
 };
 
@@ -15,12 +17,16 @@ type FieldErrors = Partial<Record<keyof FormState, string>>;
 
 export default function MaintenanceCreatePage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  useTopbarAction({
+    label: "Volver",
+    to: id ? `/vehicles/${id}/maintenances` : "/vehicles",
+  });
 
   const [form, setForm] = useState<FormState>({
     tipo: "preventivo",
     descripcion: "",
-    fecha: "",
+    fechaInicio: "",
+    fechaEntrega: "",
     costo: "",
   });
 
@@ -28,6 +34,10 @@ export default function MaintenanceCreatePage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [crearRecordatorio, setCrearRecordatorio] = useState(false);
+  const [fechaRecordatorio, setFechaRecordatorio] = useState("");
+  const [tituloRecordatorio, setTituloRecordatorio] = useState("");
+  const [detalleRecordatorio, setDetalleRecordatorio] = useState("");
 
   function handleChange(
     e: React.ChangeEvent<
@@ -47,7 +57,11 @@ export default function MaintenanceCreatePage() {
     if (!form.tipo) errs.tipo = "El tipo es obligatorio";
     if (!form.descripcion.trim())
       errs.descripcion = "La descripción es obligatoria";
-    if (!form.fecha) errs.fecha = "La fecha es obligatoria";
+    if (!form.fechaInicio) errs.fechaInicio = "La fecha de inicio es obligatoria";
+    if (!form.fechaEntrega) errs.fechaEntrega = "La fecha de entrega es obligatoria";
+    if (form.fechaInicio && form.fechaEntrega && form.fechaEntrega < form.fechaInicio) {
+      errs.fechaEntrega = "La fecha de entrega no puede ser anterior a la fecha de inicio";
+    }
     if (form.costo !== "" && isNaN(Number(form.costo)))
       errs.costo = "El costo debe ser un número";
     if (form.costo !== "" && Number(form.costo) < 0)
@@ -56,6 +70,8 @@ export default function MaintenanceCreatePage() {
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
+
+  const todayString = new Date().toISOString().slice(0, 10);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -70,8 +86,20 @@ export default function MaintenanceCreatePage() {
       const payload = {
         tipo: form.tipo,
         descripcion: form.descripcion.trim(),
-        fecha: form.fecha,
+        fechaInicio: form.fechaInicio,
+        fechaEntrega: form.fechaEntrega,
         ...(form.costo !== "" ? { costo: Number(form.costo) } : {}),
+        crearRecordatorio,
+        ...(crearRecordatorio
+          ? {
+              fechaRecordatorio: fechaRecordatorio || form.fechaInicio,
+              tituloRecordatorio:
+                tituloRecordatorio ||
+                `Mantenimiento ${form.tipo}`,
+              detalleRecordatorio:
+                detalleRecordatorio || form.descripcion.trim(),
+            }
+          : {}),
       };
 
       const { data } = await http.post(
@@ -80,7 +108,17 @@ export default function MaintenanceCreatePage() {
       );
 
       setSuccessMsg(data?.message ?? "Mantenimiento registrado con éxito");
-      setForm({ tipo: "preventivo", descripcion: "", fecha: "", costo: "" });
+      setForm({
+        tipo: "preventivo",
+        descripcion: "",
+        fechaInicio: "",
+        fechaEntrega: "",
+        costo: "",
+      });
+      setCrearRecordatorio(false);
+      setFechaRecordatorio("");
+      setTituloRecordatorio("");
+      setDetalleRecordatorio("");
       setErrors({});
     } catch (e: any) {
       const msg =
@@ -105,26 +143,10 @@ export default function MaintenanceCreatePage() {
             Registrar mantenimiento
           </h1>
           <p className="mt-1 text-sm text-slate-400">
-            Asocia un mantenimiento preventivo o correctivo al vehículo.
+            Programa un mantenimiento y bloquea la disponibilidad del vehículo durante ese rango.
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => navigate(`/vehicles/${id}/maintenances`)}
-            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
-          >
-            Ver historial
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate("/vehicles")}
-            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
-          >
-            Volver a vehículos
-          </button>
-        </div>
       </div>
 
       {/* Alerts */}
@@ -178,19 +200,105 @@ export default function MaintenanceCreatePage() {
             )}
           </div>
 
-          {/* Fecha */}
-          <div>
-            <label className="text-sm font-medium text-slate-300">
-              Fecha <span className="text-red-400">*</span>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="text-sm font-medium text-slate-300">
+                Fecha de inicio <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="date"
+                name="fechaInicio"
+                value={form.fechaInicio}
+                onChange={handleChange}
+                className={inputBase}
+              />
+              {errors.fechaInicio && <p className={errorClass}>{errors.fechaInicio}</p>}
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-slate-300">
+                Fecha de entrega <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="date"
+                name="fechaEntrega"
+                value={form.fechaEntrega}
+                onChange={handleChange}
+                min={form.fechaInicio || undefined}
+                className={inputBase}
+              />
+              {errors.fechaEntrega && <p className={errorClass}>{errors.fechaEntrega}</p>}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-black/10 p-4 space-y-4">
+            <div className="space-y-1">
+              <h2 className="text-sm font-semibold text-white">
+                Recordatorio opcional
+              </h2>
+              <p className="text-xs text-slate-400">
+                Si quieres, deja programado el aviso desde este mismo mantenimiento.
+              </p>
+            </div>
+
+            <label className="flex items-center gap-3 text-sm text-slate-200">
+              <input
+                type="checkbox"
+                checked={crearRecordatorio}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setCrearRecordatorio(checked);
+                  if (checked) {
+                    setFechaRecordatorio((current) => current || form.fechaInicio);
+                    setTituloRecordatorio((current) => current || `Mantenimiento ${form.tipo}`);
+                    setDetalleRecordatorio((current) => current || form.descripcion);
+                  }
+                }}
+                className="h-4 w-4 rounded border-white/20 bg-black/20"
+              />
+              Agregar recordatorio
             </label>
-            <input
-              type="date"
-              name="fecha"
-              value={form.fecha}
-              onChange={handleChange}
-              className={inputBase}
-            />
-            {errors.fecha && <p className={errorClass}>{errors.fecha}</p>}
+
+            {crearRecordatorio && (
+              <div className="grid grid-cols-1 gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 md:grid-cols-2">
+                <div>
+                  <label className="text-sm font-medium text-slate-300">
+                    Fecha del recordatorio
+                  </label>
+                  <input
+                    type="date"
+                    value={fechaRecordatorio}
+                    onChange={(e) => setFechaRecordatorio(e.target.value)}
+                    min={todayString}
+                    className={inputBase}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-slate-300">
+                    Título
+                  </label>
+                  <input
+                    type="text"
+                    value={tituloRecordatorio}
+                    onChange={(e) => setTituloRecordatorio(e.target.value)}
+                    className={inputBase}
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-sm font-medium text-slate-300">
+                    Detalle
+                  </label>
+                  <textarea
+                    value={detalleRecordatorio}
+                    onChange={(e) => setDetalleRecordatorio(e.target.value)}
+                    rows={3}
+                    className={`${inputBase} resize-none`}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Costo */}

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTopbarAction } from "../layout/useTopbarAction";
 import { getToken } from "../auth/token";
 
 type FieldErrors = Partial<Record<"plate" | "brand" | "model" | "year", string>>;
@@ -49,6 +50,7 @@ function mapBackendErrorsToFields(messages: string[]): {
 
 export default function VehiclesCreatePage() {
   const navigate = useNavigate();
+  useTopbarAction({ label: "Volver", to: "/vehicles" });
 
   const [form, setForm] = useState({
     plate: "",
@@ -161,13 +163,6 @@ export default function VehiclesCreatePage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => navigate("/vehicles")}
-          className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
-        >
-          Volver a vehículos
-        </button>
       </div>
 
       {/* Alerts */}
