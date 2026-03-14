@@ -88,6 +88,21 @@ export default function VehiclesPage() {
     };
   }, []);
 
+  const deleteVehicle = async (id: string, plate: string) => {
+    const confirmed = window.confirm(
+      `¿Seguro que deseas desactivar el vehículo ${plate}?`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await http.delete(`/vehicles/${id}`);
+      await loadVehicles();
+    } catch (e: any) {
+      alert(e?.response?.data?.message || "Error eliminando vehículo");
+    }
+  };
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return vehicles;
@@ -258,6 +273,15 @@ export default function VehiclesPage() {
                             >
                               Historial de alquileres
                             </button>
+                            <button
+                              onClick={() => {
+                                setOpenActionsVehicleId(null);
+                                deleteVehicle(v._id, v.plate);
+                              }}
+                              className="block w-full border-t border-white/10 px-4 py-3 text-xs font-medium text-red-400 transition hover:bg-red-500/10"
+                              >
+                                Eliminar vehículo
+                              </button>
                           </div>
                         )}
                       </div>
