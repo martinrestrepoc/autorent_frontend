@@ -277,12 +277,6 @@ export default function DashboardPage() {
 
                     <div className="flex gap-2">
                       <button
-                        onClick={() => navigate(`/vehicles/${v._id}/documents`)}
-                        className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/10"
-                      >
-                        Docs
-                      </button>
-                      <button
                         onClick={() => navigate(`/vehicles/${v._id}/edit`)}
                         className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/10"
                       >
@@ -349,3 +343,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

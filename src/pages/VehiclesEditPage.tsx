@@ -235,18 +235,6 @@ export default function VehiclesEditPage() {
             Actualiza placa, marca, modelo y año.
           </p>
         </div>
-
-        <div className="flex flex-wrap gap-2">
-          {id && (
-            <button
-              type="button"
-              onClick={() => navigate(`/vehicles/${id}/documents`)}
-              className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
-            >
-              Documentos
-            </button>
-          )}
-        </div>
       </div>
 
       {/* Alerts */}
@@ -348,3 +336,4 @@ export default function VehiclesEditPage() {
     </div>
   );
 }
+

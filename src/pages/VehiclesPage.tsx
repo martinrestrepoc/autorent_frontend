@@ -12,179 +12,137 @@ type Vehicle = {
   status?: string;
 };
 
-function Badge({ text }: { text: string }) {
-  return (
-    <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-slate-200 ring-1 ring-white/15">
-      {text}
-    </span>
-  );
-}
-
 function SkeletonRow() {
   return (
     <tr className="animate-pulse border-t border-white/10">
-      <td className="p-3">
-        <div className="h-3 w-20 rounded bg-white/10" />
-      </td>
-      <td className="p-3">
-        <div className="h-3 w-28 rounded bg-white/10" />
-      </td>
-      <td className="p-3">
-        <div className="h-3 w-28 rounded bg-white/10" />
-      </td>
-      <td className="p-3">
-        <div className="h-3 w-16 rounded bg-white/10" />
-      </td>
-      <td className="p-3">
-        <div className="h-3 w-24 rounded bg-white/10" />
-      </td>
-      <td className="p-3 text-right">
-        <div className="ml-auto h-8 w-44 rounded bg-white/10" />
-      </td>
+      <td className="p-3"><div className="h-3 w-20 rounded bg-white/10" /></td>
+      <td className="p-3"><div className="h-3 w-28 rounded bg-white/10" /></td>
+      <td className="p-3"><div className="h-3 w-28 rounded bg-white/10" /></td>
+      <td className="p-3"><div className="h-3 w-16 rounded bg-white/10" /></td>
+      <td className="p-3"><div className="h-6 w-24 rounded-full bg-white/10" /></td>
+      <td className="p-3"><div className="ml-auto h-8 w-40 rounded bg-white/10" /></td>
     </tr>
   );
 }
 
 export default function VehiclesPage() {
   const navigate = useNavigate();
-
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState("");
   const [query, setQuery] = useState("");
-  const [openActionsVehicleId, setOpenActionsVehicleId] = useState<string | null>(null);
 
   const loadVehicles = async () => {
     try {
       setError("");
       setLoading(true);
-
       const { data } = await http.get("/vehicles");
-      // soporta array directo o { vehicles: [] }
-      const list = Array.isArray(data) ? data : data.vehicles ?? [];
-      setVehicles(list);
+      const list = Array.isArray(data) ? data : data?.vehicles ?? [];
+      setVehicles(Array.isArray(list) ? list : []);
     } catch (e: any) {
-      setError(e?.response?.data?.message || "Error cargando vehículos");
+      setError(e?.response?.data?.message || "Error cargando vehiculos");
+      setVehicles([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadVehicles();
+    void loadVehicles();
   }, []);
 
-  useEffect(() => {
-    function handleOutsideClick(event: MouseEvent) {
-      const target = event.target as HTMLElement;
-      if (!target.closest("[data-actions-menu]")) {
-        setOpenActionsVehicleId(null);
-      }
-    }
-
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-    };
-  }, []);
-
-  const deleteVehicle = async (id: string, plate: string) => {
-    const confirmed = window.confirm(
-      `¿Seguro que deseas desactivar el vehículo ${plate}?`,
-    );
-
+  const deleteVehicle = async (vehicle: Vehicle) => {
+    const confirmed = window.confirm(`Seguro que deseas desactivar el vehiculo ${vehicle.plate}?`);
     if (!confirmed) return;
 
     try {
-      await http.delete(`/vehicles/${id}`);
+      await http.delete(`/vehicles/${vehicle._id}`);
       await loadVehicles();
     } catch (e: any) {
-      alert(e?.response?.data?.message || "Error eliminando vehículo");
+      setError(e?.response?.data?.message || "Error desactivando vehiculo");
     }
   };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return vehicles;
+    return vehicles.filter((v) =>
+      `${v.plate} ${v.brand} ${v.model} ${v.year} ${v.status ?? ""}`.toLowerCase().includes(q),
+    );
+  }, [query, vehicles]);
 
-    return vehicles.filter((v) => {
-      const full = `${v.plate} ${v.brand} ${v.model} ${v.year} ${v.status ?? ""}`.toLowerCase();
-      return full.includes(q);
-    });
-  }, [vehicles, query]);
-
-  const total = filtered.length;
+  const available = vehicles.filter((v) => (v.status || "").toUpperCase() === "DISPONIBLE").length;
+  const rented = vehicles.filter((v) => (v.status || "").toUpperCase() === "ALQUILADO").length;
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
+    <div className="space-y-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-white">
-            Vehículos
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-white">Vehiculos</h1>
           <p className="mt-1 text-sm text-slate-400">
-            Consulta y gestiona la flota registrada.
+            Flota disponible para la gestion basica de rentas.
           </p>
         </div>
-
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => navigate("/vehicles/new")}
-            className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:opacity-90"
+            className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:opacity-90"
           >
-            + Nuevo vehículo
+            Nuevo vehiculo
           </button>
-
           <button
             onClick={loadVehicles}
-            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+            className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
           >
             Refrescar
           </button>
         </div>
       </div>
 
-      {/* Error */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+          <p className="text-xs text-slate-400">Total vehiculos</p>
+          <p className="mt-2 text-2xl font-semibold text-white">{vehicles.length}</p>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+          <p className="text-xs text-slate-400">Disponibles</p>
+          <p className="mt-2 text-2xl font-semibold text-white">{available}</p>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+          <p className="text-xs text-slate-400">Alquilados</p>
+          <p className="mt-2 text-2xl font-semibold text-white">{rented}</p>
+        </div>
+      </div>
+
       {error && (
-        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           {error}
         </div>
       )}
 
-      {/* List */}
-      <section className="rounded-2xl border border-white/10 bg-white/5">
-        {/* Toolbar */}
+      <section className="rounded-lg border border-white/10 bg-white/5">
         <div className="flex flex-col gap-3 border-b border-white/10 p-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-2">
-            <Badge text={`${total} vehículos`} />
-            {query.trim() && <Badge text={`Filtro: "${query.trim()}"`} />}
-          </div>
-
-          <div className="w-full md:w-80">
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por placa, marca, modelo, año o estado..."
-              className="w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-slate-500 outline-none focus:border-white/25"
-            />
-          </div>
+          <p className="text-sm text-slate-300">{filtered.length} vehiculos mostrados</p>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por placa, marca, modelo o estado"
+            className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-slate-500 outline-none focus:border-white/25 md:w-96"
+          />
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto overflow-y-visible">
-          <table className="min-w-[900px] w-full text-sm">
+        <div className="overflow-x-auto">
+          <table className="min-w-[860px] w-full text-sm">
             <thead className="bg-black/20 text-slate-300">
               <tr>
-                <th className="text-left p-3 font-medium">Placa</th>
-                <th className="text-left p-3 font-medium">Marca</th>
-                <th className="text-left p-3 font-medium">Modelo</th>
-                <th className="text-left p-3 font-medium">Año</th>
-                <th className="text-left p-3 font-medium">Estado</th>
-                <th className="text-right p-3 font-medium">Acciones</th>
+                <th className="p-3 text-left font-medium">Placa</th>
+                <th className="p-3 text-left font-medium">Marca</th>
+                <th className="p-3 text-left font-medium">Modelo</th>
+                <th className="p-3 text-left font-medium">Anio</th>
+                <th className="p-3 text-left font-medium">Estado</th>
+                <th className="p-3 text-right font-medium">Acciones</th>
               </tr>
             </thead>
-
             <tbody className="text-slate-200">
               {loading ? (
                 <>
@@ -195,95 +153,37 @@ export default function VehiclesPage() {
               ) : filtered.length === 0 ? (
                 <tr>
                   <td className="p-6 text-slate-400" colSpan={6}>
-                    {vehicles.length === 0
-                      ? "Aún no tienes vehículos. Crea el primero con “+ Nuevo vehículo”."
-                      : "No hay resultados con ese filtro."}
+                    {vehicles.length === 0 ? "No hay vehiculos registrados." : "No hay resultados con ese filtro."}
                   </td>
                 </tr>
               ) : (
-                filtered.map((v) => (
-                  <tr
-                    key={v._id}
-                    className="border-t border-white/10 transition hover:bg-white/5"
-                  >
-                    <td className="p-3 font-semibold text-white">{v.plate}</td>
-                    <td className="p-3">{v.brand}</td>
-                    <td className="p-3">{v.model}</td>
-                    <td className="p-3">{v.year}</td>
-                    <td className="p-3">
-                      <VehicleStatusBadge status={v.status} />
-                    </td>
+                filtered.map((vehicle) => (
+                  <tr key={vehicle._id} className="border-t border-white/10 transition hover:bg-white/5">
+                    <td className="p-3 font-semibold text-white">{vehicle.plate}</td>
+                    <td className="p-3">{vehicle.brand}</td>
+                    <td className="p-3">{vehicle.model}</td>
+                    <td className="p-3">{vehicle.year}</td>
+                    <td className="p-3"><VehicleStatusBadge status={vehicle.status} /></td>
                     <td className="p-3 text-right">
-                      <div className="relative inline-flex" data-actions-menu>
+                      <div className="flex justify-end gap-2">
                         <button
-                          onClick={() =>
-                            setOpenActionsVehicleId((current) =>
-                              current === v._id ? null : v._id,
-                            )
-                          }
+                          onClick={() => navigate(`/vehicles/${vehicle._id}/edit`)}
                           className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/10"
                         >
-                          Acciones
+                          Editar
                         </button>
-
-                        {openActionsVehicleId === v._id && (
-                          <div className="absolute right-0 top-full z-20 mt-2 min-w-52 overflow-hidden rounded-xl border border-white/10 bg-slate-950/95 text-left shadow-2xl backdrop-blur">
-                            <button
-                              onClick={() => {
-                                setOpenActionsVehicleId(null);
-                                navigate(`/vehicles/${v._id}/documents`);
-                              }}
-                              className="block w-full px-4 py-3 text-xs font-medium text-white transition hover:bg-white/5"
-                            >
-                              Documentos
-                            </button>
-                            <button
-                              onClick={() => {
-                                setOpenActionsVehicleId(null);
-                                navigate(`/vehicles/${v._id}/maintenances`);
-                              }}
-                              className="block w-full border-t border-white/10 px-4 py-3 text-xs font-medium text-white transition hover:bg-white/5"
-                            >
-                              Mantenimientos
-                            </button>
-                            <button
-                              onClick={() => {
-                                setOpenActionsVehicleId(null);
-                                navigate(`/vehicles/${v._id}/reminders`);
-                              }}
-                              className="block w-full border-t border-white/10 px-4 py-3 text-xs font-medium text-white transition hover:bg-white/5"
-                            >
-                              Recordatorios
-                            </button>
-                            <button
-                              onClick={() => {
-                                setOpenActionsVehicleId(null);
-                                navigate(`/vehicles/${v._id}/edit`);
-                              }}
-                              className="block w-full border-t border-white/10 px-4 py-3 text-xs font-medium text-white transition hover:bg-white/5"
-                            >
-                              Editar vehículo
-                            </button>
-                            <button
-                              onClick={() => {
-                                setOpenActionsVehicleId(null);
-                                navigate(`/vehicles/${v._id}/rentals`);
-                              }}
-                              className="block w-full border-t border-white/10 px-4 py-3 text-xs font-medium text-white transition hover:bg-white/5"
-                            >
-                              Historial de alquileres
-                            </button>
-                            <button
-                              onClick={() => {
-                                setOpenActionsVehicleId(null);
-                                deleteVehicle(v._id, v.plate);
-                              }}
-                              className="block w-full border-t border-white/10 px-4 py-3 text-xs font-medium text-red-400 transition hover:bg-red-500/10"
-                              >
-                                Eliminar vehículo
-                              </button>
-                          </div>
-                        )}
+                        <button
+                          onClick={() => navigate(`/vehicles/${vehicle._id}/rentals`)}
+                          className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/10"
+                        >
+                          Historial
+                        </button>
+                        <button
+                          onClick={() => void deleteVehicle(vehicle)}
+                          className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-200 transition hover:bg-red-500/15"
+                        >
+                          Desactivar
+                        </button>
                       </div>
                     </td>
                   </tr>
